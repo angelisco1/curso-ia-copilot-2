@@ -103,4 +103,5 @@ Utiliza esta skill cuando el usuario pida ayuda para escribir, formatear o gener
 2. Determinar el `tipo` adecuado y el `alcance` opcional.
 3. Redactar una descripción concisa siguiendo las reglas de formato.
 4. Si procede, añadir un cuerpo explicativo o un pie de página para cambios rompedores.
-5. Presentar el mensaje de commit final dentro de un bloque de código para facilitar su copia.
+5. Muestrale al usuario el mensaje de commit para que lo revise, y utiliza la tool `askQuestion` para obtener su confirmación o realizar ajustes si es necesario. Si te confirma que es correcto, sigue con el siguiente paso. Si no, vuelve a redactar el mensaje según sus indicaciones.
+6. Haz el commit.
