@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "test": "ng test --watch=false",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
     "watch": "ng build --watch --configuration development"
@@ -24,6 +25,8 @@
     "@angular/build": "^21.1.2",
     "@angular/cli": "^21.1.2",
     "@angular/compiler-cli": "^21.1.0",
-    "typescript": "~5.9.2"
+    "jsdom": "^29.1.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.12"
   }
 }
