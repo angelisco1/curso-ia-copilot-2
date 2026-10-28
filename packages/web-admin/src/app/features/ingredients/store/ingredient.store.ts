@@ -10,23 +10,30 @@ export class IngredientStore {
   private readonly _ingredients = signal<Ingredient[]>([])
   private readonly _loading = signal(false)
   private readonly _error = signal<string | null>(null)
-  private _currentRestaurantId: string | null = null
+  private _loadSequence = 0
 
   readonly ingredients = this._ingredients.asReadonly()
   readonly loading = this._loading.asReadonly()
   readonly error = this._error.asReadonly()
 
   async loadByRestaurant(restaurantId: string): Promise<void> {
-    this._currentRestaurantId = restaurantId
+    const loadSequence = ++this._loadSequence
+    this._ingredients.set([])
     this._loading.set(true)
     this._error.set(null)
     try {
       const data = await firstValueFrom(this.service.getAll(restaurantId))
-      this._ingredients.set(data)
+      if (loadSequence === this._loadSequence) {
+        this._ingredients.set(data)
+      }
     } catch {
-      this._error.set('No se pudieron cargar los ingredientes.')
+      if (loadSequence === this._loadSequence) {
+        this._error.set('No se pudieron cargar los ingredientes.')
+      }
     } finally {
-      this._loading.set(false)
+      if (loadSequence === this._loadSequence) {
+        this._loading.set(false)
+      }
     }
   }
 
