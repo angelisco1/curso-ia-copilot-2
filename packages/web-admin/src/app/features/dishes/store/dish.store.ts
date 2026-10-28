@@ -10,21 +10,30 @@ export class DishStore {
   private readonly _dishes = signal<Dish[]>([])
   private readonly _loading = signal(false)
   private readonly _error = signal<string | null>(null)
+  private _loadSequence = 0
 
   readonly dishes = this._dishes.asReadonly()
   readonly loading = this._loading.asReadonly()
   readonly error = this._error.asReadonly()
 
   async loadByRestaurant(restaurantId: string): Promise<void> {
+    const loadSequence = ++this._loadSequence
+    this._dishes.set([])
     this._loading.set(true)
     this._error.set(null)
     try {
       const data = await firstValueFrom(this.service.getAll(restaurantId))
-      this._dishes.set(data)
+      if (loadSequence === this._loadSequence) {
+        this._dishes.set(data)
+      }
     } catch {
-      this._error.set('No se pudieron cargar los platos.')
+      if (loadSequence === this._loadSequence) {
+        this._error.set('No se pudieron cargar los platos.')
+      }
     } finally {
-      this._loading.set(false)
+      if (loadSequence === this._loadSequence) {
+        this._loading.set(false)
+      }
     }
   }
 

@@ -70,11 +70,12 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
   - Comprobación: `npm run test -w @resttek/web-admin` pasa; respuestas antiguas no modifican datos, error ni `loading`, la carga más reciente publica su resultado y una carga nueva no expone ingredientes del restaurante anterior. Verificar que el formulario de platos sigue cargando ingredientes desde el store.
   - Evidencia: Rojo: `npm run test -w @resttek/web-admin` falló en los 3 nuevos tests: respuestas antiguas sustituyeron datos, publicaron error y dejaron ingredientes anteriores visibles al comenzar otra carga. Verde: el mismo comando pasó los 10 tests de los 3 archivos; la secuencia `rest-1 → rest-2 → rest-1` mantiene `loading` hasta que termina la vigente, ignora el éxito antiguo y el error tardío, y conserva el mensaje existente ante un error vigente. En navegador, `/restaurants/rest-2/dishes/new` produjo `GET /api/v1/restaurants/rest-2/ingredients` y mostró `Harina`, `Levadura` y `Tomate triturado` en el selector. No se modificaron datos.
 
-- [ ] **T05 (10 min)** Aislar el resultado de la carga vigente en DishStore
-  - Archivos o componentes: `packages/web-admin/src/app/features/dishes/store/dish.store.ts`.
-  - Acción: aplicar la misma protección local de vigencia que en ingredientes, sin cambiar firmas públicas ni el comportamiento de las operaciones CRUD.
+- [x] **T05 (10 min)** ~~Aislar el resultado de la carga vigente en DishStore~~
+  - Archivos o componentes: `packages/web-admin/src/app/features/dishes/store/dish.store.spec.ts` y `packages/web-admin/src/app/features/dishes/store/dish.store.ts`.
+  - Acción: escribir primero pruebas con respuestas controladas para resultados y errores antiguos antes y después de la carga vigente; aplicar la misma protección local de vigencia que en ingredientes, sin cambiar firmas públicas ni el comportamiento de las operaciones CRUD.
   - Dependencias: T04, para conservar el mismo mecanismo en ambos stores.
-  - Comprobación: peticiones de platos resueltas fuera de orden, tanto con éxito como con error, no sustituyen el estado de la carga más reciente.
+  - Comprobación: `npm run test -w @resttek/web-admin` pasa; peticiones de platos resueltas fuera de orden, tanto con éxito como con error, no sustituyen datos, error ni `loading` de la carga más reciente.
+  - Evidencia: Rojo: `npm run test -w @resttek/web-admin` falló en los 3 nuevos tests; una respuesta obsoleta sustituyó datos, publicó error y mantuvo datos anteriores al iniciar una carga. Verde: el mismo comando pasó los 13 tests en 4 archivos; se verificaron respuestas de `A → B → A`, error obsoleto después del resultado vigente, limpieza de datos previos y mensaje de error de una petición vigente.
 
 - [ ] **T06 (10 min)** Ejecutar la matriz de regresión de navegación y concurrencia
   - Archivos o componentes: ambos listados, ambos stores y consumidores de formularios; criterios CA01–CA06.
