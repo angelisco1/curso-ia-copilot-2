@@ -77,11 +77,12 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
   - Comprobación: `npm run test -w @resttek/web-admin` pasa; peticiones de platos resueltas fuera de orden, tanto con éxito como con error, no sustituyen datos, error ni `loading` de la carga más reciente.
   - Evidencia: Rojo: `npm run test -w @resttek/web-admin` falló en los 3 nuevos tests; una respuesta obsoleta sustituyó datos, publicó error y mantuvo datos anteriores al iniciar una carga. Verde: el mismo comando pasó los 13 tests en 4 archivos; se verificaron respuestas de `A → B → A`, error obsoleto después del resultado vigente, limpieza de datos previos y mensaje de error de una petición vigente.
 
-- [ ] **T06 (10 min)** Ejecutar la matriz de regresión de navegación y concurrencia
+- [x] **T06 (10 min)** ~~Ejecutar la matriz de regresión de navegación y concurrencia~~
   - Archivos o componentes: ambos listados, ambos stores y consumidores de formularios; criterios CA01–CA06.
   - Acción: usar datos distinguibles por restaurante. Probar navegación lateral y atrás/adelante, respuesta vacía, fallo de carga y recuperación. Con interceptación de red en navegador, retrasar respuestas para reproducir `A → B` y `A → B → A`, incluyendo errores antiguos y una petición vigente todavía pendiente. Verificar borrado y disponibilidad con respuestas simuladas o datos de prueba autorizados.
   - Dependencias: T02, T03, T04, T05.
   - Comprobación: registrar escenarios, orden de respuestas y resultados visibles en la evidencia de los criterios. Sin runner frontend configurado, no presentar pruebas de API como cobertura de esta regresión.
+  - Evidencia: tarea manual de regresión, sin cambio de comportamiento ni prueba automatizada nueva; rojo/verde no aplica. En el navegador se interceptaron las lecturas y escrituras de ambos listados, sin modificar datos reales. Para Ingredientes y Platos se verificaron carga sin filas anteriores, respuesta vacía, HTTP 500 con el mensaje existente y recuperación posterior. Con respuestas controladas se probaron `A → B` y `A → B → A`, éxitos y errores obsoletos antes y después de la respuesta vigente, además de mantener pendiente la vigente: los resultados tardíos no cambiaron filas, error ni `loading`. Se recorrió navegación lateral, entrada directa, atrás/adelante y salida/reentrada; cada cambio efectivo produjo su GET, sin duplicados crecientes. En `rest-2` se comprobaron los enlaces de alta/edición, DELETE de ingredientes y platos y PUT de disponibilidad; todas las escrituras fueron interceptadas. Se crearon mediante POST simulados un ingrediente y un plato: cada formulario regresó a su listado de `rest-2`, y el formulario de platos cargó el ingrediente simulado y lo envió asociado en el POST. No se modificaron datos reales.
 
 - [ ] **T07 (10 min)** Documentar la regresión y validar la compilación Angular
   - Archivos o componentes: `packages/web-admin/README.md`, este plan y el paquete `@resttek/web-admin`.
@@ -99,18 +100,18 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 - [x] **CA02** Platos cambia al restaurante de la URL sin recarga completa.
   - Verificación: repetir CA01 con `restaurants/rest-1/dishes` y `restaurants/rest-2/dishes`, comparando filas con cada respuesta.
   - Evidencia: el menú cambió entre ambos restaurantes sin recarga, emitió un GET por transición y mostró los platos distintos correspondientes. La entrada directa a `rest-2/dishes` emitió su GET y mostró `Pizza Napolitana` y `Limonada Casera`.
-- [ ] **CA03** Los estados vacío, carga y error no muestran registros del restaurante anterior.
+- [x] **CA03** Los estados vacío, carga y error no muestran registros del restaurante anterior.
   - Verificación: para cada listado, pasar de un restaurante con datos a otro cuya respuesta se retrase, devuelva `[]` o falle con HTTP 500. Observar respectivamente indicador de carga, mensaje vacío o mensaje de error existente, nunca la tabla anterior. Volver a uno con respuesta correcta y comprobar la recuperación.
-  - Evidencia: pendiente.
-- [ ] **CA04** Solo la carga más reciente puede modificar datos, error y estado de carga.
+  - Evidencia: con GETs interceptados en ambos listados se comprobó que la carga no muestra las filas anteriores, que `[]` presenta el estado vacío y HTTP 500 el mensaje de error existente. Una respuesta correcta posterior recuperó las filas del restaurante solicitado.
+- [x] **CA04** Solo la carga más reciente puede modificar datos, error y estado de carga.
   - Verificación: en ambas secciones, interceptar peticiones para resolver `A → B` y `A → B → A` fuera de orden. Entregar éxitos y errores antiguos antes y después de la respuesta vigente. Mientras esta siga pendiente, `loading` permanece activo; al terminar, solo su resultado determina la pantalla.
-  - Evidencia: pendiente.
-- [ ] **CA05** Las acciones y enlaces conservan el restaurante actual.
+  - Evidencia: en ambos listados se controlaron secuencias `A → B` y `A → B → A`, con respuestas antiguas de éxito y error antes y después de resolver la vigente. Mientras la vigente permanecía pendiente se mantuvo la carga; al finalizar, solo sus datos/error afectaron la pantalla. No se observaron filas ni errores publicados por respuestas obsoletas.
+- [x] **CA05** Las acciones y enlaces conservan el restaurante actual.
   - Verificación: tras cambiar a B, comprobar enlaces de alta/edición bajo `/restaurants/B/...`, DELETE de ingredientes y platos bajo B y PUT de disponibilidad bajo B con el nuevo valor esperado. Usar interceptación o datos de prueba autorizados, sin modificar datos reales. Comprobar que guardar y volver desde los formularios sigue mostrando la lista del restaurante correcto y que el formulario de platos carga sus ingredientes.
-  - Evidencia: pendiente.
-- [ ] **CA06** La entrada directa y el historial siguen funcionando sin cargas duplicadas por suscripciones acumuladas.
+  - Evidencia: bajo `rest-2`, los enlaces de alta/edición conservaron sus rutas; los DELETE de ambos tipos y el PUT de disponibilidad apuntaron a `rest-2` y fueron interceptados. Los POST simulados de alta de ingrediente y plato regresaron a sus listados bajo `rest-2`; el selector del formulario de platos mostró el ingrediente de `rest-2` y el POST incluyó su ID y cantidad. No se modificaron datos reales.
+- [x] **CA06** La entrada directa y el historial siguen funcionando sin cargas duplicadas por suscripciones acumuladas.
   - Verificación: abrir directamente cada listado, navegar varias veces mediante atrás/adelante y salir/volver a la sección. Comprobar una carga inicial por instancia y una por cambio efectivo de restaurante, sin incremento progresivo de peticiones.
-  - Evidencia: pendiente.
+  - Evidencia: la entrada directa a cada listado produjo una carga; varias transiciones con menú y atrás/adelante, y salir/volver a la sección, produjeron una petición por cambio efectivo, sin duplicados crecientes.
 - [ ] **CA07** El paquete compila y la regresión queda documentada.
   - Verificación: `npm run build -w @resttek/web-admin` termina con código 0; el README del paquete recoge los pasos de cambio entre restaurantes y el diff no incluye alteraciones ajenas al arreglo.
   - Evidencia: pendiente.
@@ -127,7 +128,7 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 
 - No hay ambigüedades funcionales que requieran una decisión del usuario para iniciar el arreglo.
 - Pendiente técnico: confirmar en T01 la reutilización y el nivel real del parámetro en la ruta activada. Bloquea T02 y T03 hasta comprobarlo; no bloquea la planificación.
-- Verificación operativa: API, admin y datos diferenciados de `rest-1` y `rest-2` disponibles en el entorno local; se usaron solo GETs, sin ejecutar el seed ni modificar datos. Para T06 siguen pendientes las respuestas retrasadas, errores y escenarios concurrentes, que deberán probarse con interceptación local.
+- Verificación operativa: API y admin disponibles en el entorno local; para la matriz T06 las respuestas de lectura y escritura se interceptaron en el navegador, sin ejecutar el seed ni modificar datos reales.
 - Decisión pendiente resuelta: el usuario autorizó incorporar un runner frontend y ampliar el plan antes de modificar producción. T02 configura el builder de pruebas de Angular con Vitest y jsdom; `npm test` de la raíz conserva su alcance exclusivo de API.
 
 ## Decisiones tomadas durante la planificación
