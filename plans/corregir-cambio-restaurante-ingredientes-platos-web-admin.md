@@ -14,13 +14,14 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
 - Conservar los estados actuales de carga, error y lista vacía, así como los enlaces de alta y edición.
 - Verificar la navegación en ambos sentidos, los cambios rápidos y las acciones existentes.
 - Documentar el contrato de navegación y el procedimiento de regresión.
+- Añadir pruebas unitarias persistentes en web-admin para los cambios de parámetro y sus acciones.
 
 ### Fuera de alcance
 
 - Cambios en API, contratos HTTP, permisos o reglas del dominio.
 - Corregir otros contextos, dashboards o la reutilización entre formularios.
 - Cambiar la estrategia global de reutilización de rutas o forzar recargas completas.
-- Refactorizaciones generales, caché por restaurante o nuevas dependencias de pruebas.
+- Refactorizaciones generales, caché por restaurante o cambios en la estrategia global de pruebas del monorepo.
 - Implementar el arreglo durante esta planificación.
 
 ## Contexto comprobado
@@ -46,13 +47,14 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
   - Acción: con API y admin disponibles, navegar de `rest-1` a `rest-2` y de vuelta dentro de cada sección. Registrar URL, peticiones GET y datos visibles; confirmar qué ruta ancestral contiene `restaurantId` y si se reutiliza el listado.
   - Dependencias: ninguna.
   - Comprobación: disponer de evidencia del fallo anterior al cambio y del parámetro que debe observarse. Si el diagnóstico no coincide, ajustar este plan antes de modificar código.
-  - Evidencia: con API (`GET /health` → 200), web-admin en `localhost:4200` y sesión de administrador, recargar `/restaurants/rest-1/ingredients` produjo `GET /api/v1/restaurants/rest-1/ingredients`. Cambiar por el menú a `rest-2` y volver a `rest-1` produjo 0 GETs; las cinco filas permanecieron. En Platos se comprobó lo mismo en ambos sentidos: la entrada directa produjo el GET de `rest-1` y los cambios de restaurante no produjeron GETs; las cinco filas permanecieron. No se modificaron datos. La primera carga confirma que el `restaurantId` del `snapshot` leído desde `route.parent` llega al servicio; la jerarquía efectiva es `restaurants/:restaurantId` → `dishes`/`ingredients` (carga diferida) → ruta vacía del listado. Los enlaces se actualizan con la URL, pero el listado conserva los datos y la instancia visual, consistente con la reutilización del componente. Los datos de muestra visibles son iguales en ambos restaurantes, por lo que la ausencia de GET es la evidencia discriminante del fallo. T01 es diagnóstico: rojo/verde no aplica.
+  - Evidencia: con API (`GET /health` → 200), web-admin en `localhost:4200` y sesión de administrador, recargar `/restaurants/rest-1/ingredients` produjo `GET /api/v1/restaurants/rest-1/ingredients`. Cambiar por el menú a `rest-2` y volver a `rest-1` produjo 0 GETs; las cinco filas de `rest-1` permanecieron bajo ambas URL. En Platos se comprobó lo mismo en ambos sentidos: la entrada directa produjo el GET de `rest-1` y los cambios de restaurante no produjeron GETs; las cinco filas de `rest-1` permanecieron. No se modificaron datos. La primera carga confirma que el `restaurantId` del `snapshot` leído desde `route.parent` llega al servicio; la jerarquía efectiva es `restaurants/:restaurantId` → `dishes`/`ingredients` (carga diferida) → ruta vacía del listado. Los enlaces se actualizan con la URL, pero el listado conserva los datos y la instancia visual, consistente con la reutilización del componente. Como el cambio no solicitó la respuesta de `rest-2`, sus datos correctos no se conocieron hasta la verificación posterior de T02. T01 es diagnóstico: rojo/verde no aplica.
 
-- [ ] **T02 (10 min)** Hacer reactiva la carga del listado de ingredientes
-  - Archivos o componentes: `packages/web-admin/src/app/features/ingredients/pages/ingredient-list/ingredient-list.component.ts`.
-  - Acción: observar el `paramMap` del nivel confirmado en T01, omitir emisiones repetidas del mismo identificador y sincronizar `restaurantId` antes de solicitar la carga. Liberar la suscripción al destruir el componente con `takeUntilDestroyed` y un contexto de inyección válido. Conservar la acción de borrado y no introducir una segunda carga inicial.
+- [x] **T02 (20 min)** ~~Hacer reactiva la carga del listado de ingredientes y habilitar pruebas frontend~~
+  - Archivos o componentes: `package.json`, `package-lock.json`, `packages/web-admin/angular.json`, `packages/web-admin/package.json`, `packages/web-admin/tsconfig.spec.json`, `packages/web-admin/src/app/features/ingredients/pages/ingredient-list/ingredient-list.component.spec.ts` y `packages/web-admin/src/app/features/ingredients/pages/ingredient-list/ingredient-list.component.ts`.
+  - Acción: habilitar pruebas unitarias de web-admin con `@angular/build:unit-test`, Vitest 4 y jsdom. Vitest 4 debe estar disponible desde la raíz para la resolución del builder de Angular; conservar la versión 3 del runner declarada por API y no añadir un script global. Escribir primero una prueba de regresión para la secuencia de parámetros, carga única y acciones, y ejecutarla contra el componente actual. Después observar el `paramMap` del nivel confirmado en T01, omitir emisiones repetidas del mismo identificador y sincronizar `restaurantId` antes de solicitar la carga. Liberar la suscripción al destruir el componente con `takeUntilDestroyed` y un contexto de inyección válido. Conservar la acción de borrado y no introducir una segunda carga inicial.
   - Dependencias: T01.
-  - Comprobación: entrada directa y navegación `rest-1 → rest-2 → rest-1` producen una carga inicial y una carga por cambio efectivo, con ingredientes y borrado vinculados a la URL vigente.
+  - Comprobación: `npm run test -w @resttek/web-admin` pasa; la prueba verifica que `rest-1 → rest-2 → rest-1` produce una carga inicial y una carga por cambio efectivo, que las emisiones repetidas se omiten, que borrado usa el restaurante vigente y que destruir el componente termina la suscripción.
+  - Evidencia: Rojo: `npm run test -w @resttek/web-admin` compiló con Vitest 4.1.12 y falló por la causa esperada en 2 de 3 tests: los cambios de parámetro no provocaban cargas y el borrado seguía usando `rest-1`. Verde: el mismo comando pasó los 3 tests tras observar `parent.paramMap`, filtrar IDs repetidos y finalizar la suscripción al destruirse el componente. `npm test` pasó los 66 tests de API en 10 archivos con Vitest 3.2.7. `npm run build -w @resttek/web-admin` terminó correctamente. Verificación en navegador: desde `rest-1`, el menú emitió GETs para `/api/v1/restaurants/rest-2/ingredients` y al volver para `/api/v1/restaurants/rest-1/ingredients`, sin recarga completa; se vieron respectivamente `Harina`, `Levadura` y `Tomate triturado` (3 filas), y las cinco filas de `rest-1`. No se modificaron datos.
 
 - [ ] **T03 (10 min)** Hacer reactiva la carga del listado de platos
   - Archivos o componentes: `packages/web-admin/src/app/features/dishes/pages/dish-list/dish-list.component.ts`.
@@ -63,7 +65,7 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
 - [ ] **T04 (10 min)** Aislar el resultado de la carga vigente en IngredientStore
   - Archivos o componentes: `packages/web-admin/src/app/features/ingredients/store/ingredient.store.ts`.
   - Acción: identificar cada invocación de carga con una secuencia o token local y permitir que solo la vigente publique datos, error y finalización. No usar únicamente el restaurante como identidad, porque `A → B → A` puede dejar dos peticiones de A pendientes. Evitar exponer ingredientes anteriores al cambiar de restaurante y mantener los mensajes existentes.
-  - Dependencias: T01.
+  - Dependencias: T01, T02, para reutilizar la infraestructura de pruebas frontend.
   - Comprobación: con respuestas controladas fuera de orden, una carga anterior no altera datos, error ni `loading` de la última. Comprobar también la carga desde el formulario de platos.
 
 - [ ] **T05 (10 min)** Aislar el resultado de la carga vigente en DishStore
@@ -88,9 +90,9 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 
 ## Criterios de aceptación
 
-- [ ] **CA01** Ingredientes cambia al restaurante de la URL sin recarga completa.
+- [x] **CA01** Ingredientes cambia al restaurante de la URL sin recarga completa.
   - Verificación: desde `restaurants/rest-1/ingredients`, abrir Ingredientes de `rest-2` en el menú lateral y volver a `rest-1`. Comprobar un GET por cambio efectivo y que nombres/identificadores visibles corresponden exclusivamente a la respuesta del restaurante elegido.
-  - Evidencia: pendiente.
+  - Evidencia: navegador local confirmó un GET por transición a cada restaurante; `rest-2` mostró Harina, Levadura y Tomate triturado, y `rest-1` mostró Tomate, Queso mozzarella, Aceite de oliva, Ajo y Albahaca. La URL cambió sin recarga completa.
 - [ ] **CA02** Platos cambia al restaurante de la URL sin recarga completa.
   - Verificación: repetir CA01 con `restaurants/rest-1/dishes` y `restaurants/rest-2/dishes`, comparando filas con cada respuesta.
   - Evidencia: pendiente.
@@ -122,8 +124,8 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 
 - No hay ambigüedades funcionales que requieran una decisión del usuario para iniciar el arreglo.
 - Pendiente técnico: confirmar en T01 la reutilización y el nivel real del parámetro en la ruta activada. Bloquea T02 y T03 hasta comprobarlo; no bloquea la planificación.
-- Pendiente operativo: comprobar disponibilidad de API, admin y datos diferenciados de dos restaurantes. Su ausencia bloquea la validación real, no el análisis. No ejecutar el seed ni modificar datos compartidos sin confirmar que el entorno es de prueba; usar interceptación local para los casos vacíos, errores y concurrencia.
-- Si durante la implementación se exige automatización persistente de las pruebas, será necesario acordar la incorporación de un runner frontend y ampliar el plan; no está configurado actualmente y no se añade implícitamente.
+- Verificación operativa: API, admin y datos diferenciados de `rest-1` y `rest-2` disponibles en el entorno local; se usaron solo GETs, sin ejecutar el seed ni modificar datos. Para T06 siguen pendientes las respuestas retrasadas, errores y escenarios concurrentes, que deberán probarse con interceptación local.
+- Decisión pendiente resuelta: el usuario autorizó incorporar un runner frontend y ampliar el plan antes de modificar producción. T02 configura el builder de pruebas de Angular con Vitest y jsdom; `npm test` de la raíz conserva su alcance exclusivo de API.
 
 ## Decisiones tomadas durante la planificación
 
@@ -133,3 +135,4 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 - Usar regresión de navegador documentada y compilación con las herramientas existentes, sin añadir dependencias de pruebas por iniciativa propia. Consecuencia: las evidencias de navegador deberán ejecutarse y registrarse explícitamente; el build por sí solo no acredita el arreglo.
 - Limitar la documentación al README de web-admin y al seguimiento en este plan: no cambian los contratos ni la arquitectura del dominio.
 - El requisito explícito del usuario es corregir ambos listados al cambiar de restaurante. Las medidas de concurrencia, limpieza de suscripciones y matriz de regresión son decisiones técnicas para hacerlo fiable, no funcionalidades adicionales solicitadas.
+- Por autorización del usuario, T02 añade soporte de pruebas unitarias local a web-admin para practicar TDD y conservar cobertura automatizada de la navegación reactiva. No se amplía ni se altera el runner de la API.

@@ -12,5 +12,8 @@
     "dev:clientes": "npm run start -w @resttek/web-clientes",
     "test": "npm run test -w @resttek/api",
     "seed": "npm run seed -w @resttek/api"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.12"
   }
 }
