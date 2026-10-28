@@ -56,11 +56,12 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
   - Comprobación: `npm run test -w @resttek/web-admin` pasa; la prueba verifica que `rest-1 → rest-2 → rest-1` produce una carga inicial y una carga por cambio efectivo, que las emisiones repetidas se omiten, que borrado usa el restaurante vigente y que destruir el componente termina la suscripción.
   - Evidencia: Rojo: `npm run test -w @resttek/web-admin` compiló con Vitest 4.1.12 y falló por la causa esperada en 2 de 3 tests: los cambios de parámetro no provocaban cargas y el borrado seguía usando `rest-1`. Verde: el mismo comando pasó los 3 tests tras observar `parent.paramMap`, filtrar IDs repetidos y finalizar la suscripción al destruirse el componente. `npm test` pasó los 66 tests de API en 10 archivos con Vitest 3.2.7. `npm run build -w @resttek/web-admin` terminó correctamente. Verificación en navegador: desde `rest-1`, el menú emitió GETs para `/api/v1/restaurants/rest-2/ingredients` y al volver para `/api/v1/restaurants/rest-1/ingredients`, sin recarga completa; se vieron respectivamente `Harina`, `Levadura` y `Tomate triturado` (3 filas), y las cinco filas de `rest-1`. No se modificaron datos.
 
-- [ ] **T03 (10 min)** Hacer reactiva la carga del listado de platos
-  - Archivos o componentes: `packages/web-admin/src/app/features/dishes/pages/dish-list/dish-list.component.ts`.
-  - Acción: aplicar el mismo patrón de observación y limpieza, actualizando el identificador empleado por borrado y disponibilidad. Mantener formato de precio, categorías y enlaces relativos.
+- [x] **T03 (10 min)** ~~Hacer reactiva la carga del listado de platos~~
+  - Archivos o componentes: `packages/web-admin/src/app/features/dishes/pages/dish-list/dish-list.component.spec.ts` y `packages/web-admin/src/app/features/dishes/pages/dish-list/dish-list.component.ts`.
+  - Acción: escribir primero pruebas para los cambios de restaurante, borrado y disponibilidad; aplicarlas con el runner configurado en T02. Aplicar el mismo patrón de observación y limpieza, actualizando el identificador empleado por borrado y disponibilidad. Mantener formato de precio, categorías y enlaces relativos.
   - Dependencias: T01, T02, para mantener el mismo patrón local en ambas pantallas.
-  - Comprobación: entrada directa y navegación en ambos sentidos muestran los platos correctos; no hay duplicación de la carga inicial y las acciones apuntan al restaurante actual.
+  - Comprobación: `npm run test -w @resttek/web-admin` pasa; la prueba verifica una carga inicial, una por cambio efectivo, omisión de IDs repetidos, limpieza al destruir y que borrado y disponibilidad usan el restaurante actual. Navegación real en ambos sentidos mantiene filas y acciones del restaurante indicado; el build final se comprueba en T07.
+  - Evidencia: Rojo: `npm run test -w @resttek/web-admin` compiló y falló en los 3 tests de navegación, borrado y disponibilidad; las llamadas seguían usando solo `rest-1`, mientras el test de destrucción pasó. Verde: el mismo comando pasó los 7 tests de ambos listados en 2 archivos. Navegador: desde `rest-1` se solicitaron sucesivamente los GET de `rest-1`, `rest-2` y `rest-1`; se vieron las cinco filas iniciales, `Pizza Napolitana` y `Limonada Casera` de `rest-2`, y luego las filas iniciales. La entrada directa a `/restaurants/rest-2/dishes` también produjo su GET y mostró esos dos platos; se conservan categoría y precio (`Principal`, `14.00 €`; `Bebida`, `3.50 €`). No se modificaron datos. Build de producción queda para T07.
 
 - [ ] **T04 (10 min)** Aislar el resultado de la carga vigente en IngredientStore
   - Archivos o componentes: `packages/web-admin/src/app/features/ingredients/store/ingredient.store.ts`.
@@ -93,9 +94,9 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 - [x] **CA01** Ingredientes cambia al restaurante de la URL sin recarga completa.
   - Verificación: desde `restaurants/rest-1/ingredients`, abrir Ingredientes de `rest-2` en el menú lateral y volver a `rest-1`. Comprobar un GET por cambio efectivo y que nombres/identificadores visibles corresponden exclusivamente a la respuesta del restaurante elegido.
   - Evidencia: navegador local confirmó un GET por transición a cada restaurante; `rest-2` mostró Harina, Levadura y Tomate triturado, y `rest-1` mostró Tomate, Queso mozzarella, Aceite de oliva, Ajo y Albahaca. La URL cambió sin recarga completa.
-- [ ] **CA02** Platos cambia al restaurante de la URL sin recarga completa.
+- [x] **CA02** Platos cambia al restaurante de la URL sin recarga completa.
   - Verificación: repetir CA01 con `restaurants/rest-1/dishes` y `restaurants/rest-2/dishes`, comparando filas con cada respuesta.
-  - Evidencia: pendiente.
+  - Evidencia: el menú cambió entre ambos restaurantes sin recarga, emitió un GET por transición y mostró los platos distintos correspondientes. La entrada directa a `rest-2/dishes` emitió su GET y mostró `Pizza Napolitana` y `Limonada Casera`.
 - [ ] **CA03** Los estados vacío, carga y error no muestran registros del restaurante anterior.
   - Verificación: para cada listado, pasar de un restaurante con datos a otro cuya respuesta se retrase, devuelva `[]` o falle con HTTP 500. Observar respectivamente indicador de carga, mensaje vacío o mensaje de error existente, nunca la tabla anterior. Volver a uno con respuesta correcta y comprobar la recuperación.
   - Evidencia: pendiente.

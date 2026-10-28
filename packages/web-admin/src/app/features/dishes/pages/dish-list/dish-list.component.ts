@@ -1,7 +1,9 @@
-import { Component, inject, OnInit, signal } from '@angular/core'
+import { Component, DestroyRef, inject, OnInit } from '@angular/core'
 import { ActivatedRoute, RouterLink } from '@angular/router'
 import { FormsModule } from '@angular/forms'
 import { LucideAngularModule } from 'lucide-angular'
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop'
+import { distinctUntilChanged, map } from 'rxjs'
 import { DishStore } from '../../store/dish.store'
 
 @Component({
@@ -14,13 +16,20 @@ import { DishStore } from '../../store/dish.store'
 export class DishListComponent implements OnInit {
   readonly store = inject(DishStore)
   private readonly route = inject(ActivatedRoute)
+  private readonly destroyRef = inject(DestroyRef)
   restaurantId = ''
 
   ngOnInit(): void {
-    this.restaurantId = this.route.parent?.snapshot.params['restaurantId'] ?? ''
-    if (this.restaurantId) {
-      this.store.loadByRestaurant(this.restaurantId)
-    }
+    this.route.parent?.paramMap.pipe(
+      map(params => params.get('restaurantId') ?? ''),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(restaurantId => {
+      this.restaurantId = restaurantId
+      if (restaurantId) {
+        void this.store.loadByRestaurant(restaurantId)
+      }
+    })
   }
 
   async onDelete(id: string): Promise<void> {
