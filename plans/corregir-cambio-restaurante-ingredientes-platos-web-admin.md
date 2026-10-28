@@ -84,11 +84,12 @@ Al navegar desde Ingredientes del restaurante 1 a Ingredientes del restaurante 2
   - Comprobación: registrar escenarios, orden de respuestas y resultados visibles en la evidencia de los criterios. Sin runner frontend configurado, no presentar pruebas de API como cobertura de esta regresión.
   - Evidencia: tarea manual de regresión, sin cambio de comportamiento ni prueba automatizada nueva; rojo/verde no aplica. En el navegador se interceptaron las lecturas y escrituras de ambos listados, sin modificar datos reales. Para Ingredientes y Platos se verificaron carga sin filas anteriores, respuesta vacía, HTTP 500 con el mensaje existente y recuperación posterior. Con respuestas controladas se probaron `A → B` y `A → B → A`, éxitos y errores obsoletos antes y después de la respuesta vigente, además de mantener pendiente la vigente: los resultados tardíos no cambiaron filas, error ni `loading`. Se recorrió navegación lateral, entrada directa, atrás/adelante y salida/reentrada; cada cambio efectivo produjo su GET, sin duplicados crecientes. En `rest-2` se comprobaron los enlaces de alta/edición, DELETE de ingredientes y platos y PUT de disponibilidad; todas las escrituras fueron interceptadas. Se crearon mediante POST simulados un ingrediente y un plato: cada formulario regresó a su listado de `rest-2`, y el formulario de platos cargó el ingrediente simulado y lo envió asociado en el POST. No se modificaron datos reales.
 
-- [ ] **T07 (10 min)** Documentar la regresión y validar la compilación Angular
+- [x] **T07 (10 min)** ~~Documentar la regresión y validar la compilación Angular~~
   - Archivos o componentes: `packages/web-admin/README.md`, este plan y el paquete `@resttek/web-admin`.
   - Acción: añadir un procedimiento breve de regresión del cambio de restaurante y su resultado esperado al README del paquete. Ejecutar `npm run build -w @resttek/web-admin`; revisar el diff para confirmar que no cambia API ni configuración global de rutas.
   - Dependencias: T06.
   - Comprobación: compilación correcta, procedimiento reproducible y evidencia de todos los criterios registrada. Cualquier fallo o limitación queda explícito y pendiente; no se oculta con un resultado de otra suite.
+  - Evidencia: tarea de documentación y validación, sin cambio de comportamiento; rojo/verde no aplica. `packages/web-admin/README.md` ahora documenta preparación, cambio entre restaurantes, historial, carga/error/vacío, concurrencia, acciones y escritura interceptada. `npm run test -w @resttek/web-admin` pasó 13 tests en 4 archivos; `npm run build -w @resttek/web-admin` terminó correctamente. La revisión del diff se limita al README y al seguimiento de este plan, sin cambios de API ni de rutas globales.
 
 Estimación total: 70 minutos, sin incluir esperas por servicios o preparación externa de datos.
 
@@ -112,9 +113,9 @@ Estimación total: 70 minutos, sin incluir esperas por servicios o preparación 
 - [x] **CA06** La entrada directa y el historial siguen funcionando sin cargas duplicadas por suscripciones acumuladas.
   - Verificación: abrir directamente cada listado, navegar varias veces mediante atrás/adelante y salir/volver a la sección. Comprobar una carga inicial por instancia y una por cambio efectivo de restaurante, sin incremento progresivo de peticiones.
   - Evidencia: la entrada directa a cada listado produjo una carga; varias transiciones con menú y atrás/adelante, y salir/volver a la sección, produjeron una petición por cambio efectivo, sin duplicados crecientes.
-- [ ] **CA07** El paquete compila y la regresión queda documentada.
+- [x] **CA07** El paquete compila y la regresión queda documentada.
   - Verificación: `npm run build -w @resttek/web-admin` termina con código 0; el README del paquete recoge los pasos de cambio entre restaurantes y el diff no incluye alteraciones ajenas al arreglo.
-  - Evidencia: pendiente.
+  - Evidencia: build de producción final correcto; `packages/web-admin/README.md` contiene el procedimiento manual y los comandos de pruebas/build. El diff de T07 no modifica API ni configuración global de rutas.
 
 ## Reglas de seguimiento y finalización
 

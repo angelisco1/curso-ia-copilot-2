@@ -42,6 +42,20 @@ Vista general con el listado de restaurantes.
 - Alta y listado de empleados por restaurante.
 - Roles asignables desde el formulario: `manager`, `camarero`, `cocinero`.
 
+## Regresión: cambio de restaurante
+
+1. Inicia la API y web-admin desde la raíz (`npm run dev:api` y `npm run dev:admin`). Si faltan los datos de ejemplo, ejecuta `npm run seed`; accede con `admin@resttek.com` como usuario y contraseña.
+2. Abre `/restaurants/rest-1/ingredients` y cambia desde el menú a Ingredientes de `rest-2`; vuelve después a `rest-1`. Repite el recorrido con Platos. En cada transición, comprueba que la URL y las filas corresponden al restaurante seleccionado, sin recargar la página. Los datos de ejemplo distinguen los restaurantes: `rest-2` incluye Harina, Levadura y Tomate triturado.
+3. Abre directamente ambos listados y prueba atrás/adelante y salir/volver a cada sección. Debe haber una carga por entrada o cambio efectivo, sin filas anteriores durante la carga ni peticiones duplicadas.
+4. Con las respuestas de red interceptadas, comprueba los estados vacío, HTTP 500 y recuperación, además de respuestas retrasadas fuera de orden (`rest-1 → rest-2` y `rest-1 → rest-2 → rest-1`). Solo la última carga debe determinar las filas, el error y el estado de carga.
+5. Tras cambiar a `rest-2`, comprueba que los enlaces de alta/edición y las peticiones de guardado, borrado y disponibilidad usan ese restaurante; el formulario de platos debe cargar sus ingredientes. Intercepta las escrituras para no modificar datos reales.
+6. Ejecuta las pruebas y la compilación del paquete:
+
+   ```bash
+   npm run test -w @resttek/web-admin
+   npm run build -w @resttek/web-admin
+   ```
+
 ## Estructura del Proyecto
 
 ```
