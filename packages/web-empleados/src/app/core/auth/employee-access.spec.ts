@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing'
-import { canAccessView, EmployeeView, getInitialRoute } from './employee-access'
+import { canAccessView, getInitialRoute, type EmployeeView } from './employee-access'
 
 const accessCases: Array<[string | null, EmployeeView, boolean]> = [
   ['camarero', 'barra', true],

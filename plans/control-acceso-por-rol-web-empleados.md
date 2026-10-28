@@ -68,11 +68,12 @@ El usuario ha confirmado que un camarero o cocinero que solicite una vista no pe
   - Comprobación: el comando focalizado de T01 falla por la política todavía no implementada, no por una avería del runner. Registrar el resultado rojo y las combinaciones cubiertas.
   - Evidencia TDD: se añadió el contrato tipado y un esqueleto temporal de denegación predeterminada para que el rojo mida aserciones y no un error de importación. `npm run test -w @resttek/web-empleados -- --include=src/app/core/auth/employee-access.spec.ts` terminó con código 1 por 13 aserciones de permisos/destinos autorizados; las 17 restantes pasaron, incluidas las denegaciones para cliente/rol ausente/desconocido y vista desconocida.
 
-- [ ] **T03 (5 min)** Implementar una política local y tipada de acceso
+- [x] **T03 (5 min)** ~~Implementar una política local y tipada de acceso~~
   - Acción: definir el tipo de vista, la matriz de roles y el destino inicial mediante funciones pequeñas en un único módulo local. Denegar valores desconocidos sin recurrir a `any` ni modificar AuthStore; normalizar mediante comprobaciones en el punto de consumo. Usar los valores reales `manager` y `admin`.
   - Archivos o componentes: nuevo `packages/web-empleados/src/app/core/auth/employee-access.ts`.
   - Dependencias: T02.
   - Comprobación: todas las pruebas de T02 pasan; las nueve combinaciones de camarero/cocinero/manager y las tres de admin coinciden con la matriz del objetivo.
+  - Evidencia TDD: verde — `npm run test -w @resttek/web-empleados -- --include=src/app/core/auth/employee-access.spec.ts` terminó con código 0 (30 pruebas pasadas). Se verificaron los doce permisos de camarero/cocinero/manager/admin, los destinos iniciales, roles cliente/nulo/desconocido y la denegación de una vista desconocida.
 
 - [ ] **T04 (10 min)** Reproducir el bypass con pruebas de navegación del router
   - Acción: añadir specs con TestBed y RouterTestingHarness, o utilidades equivalentes del router instalado, ejercitando la configuración real de rutas y sustituyendo únicamente servicios externos. Cubrir las doce combinaciones de los cuatro roles y tres rutas, navegación entre hermanas con el shell activo, `/`, ausencia de sesión y roles no admitidos. Espiar la activación del componente restringido y las llamadas a su store para demostrar que no llega a inicializarse.
