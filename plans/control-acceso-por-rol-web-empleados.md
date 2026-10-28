@@ -61,11 +61,12 @@ El usuario ha confirmado que un camarero o cocinero que solicite una vista no pe
   - Comprobación: `npm run test -w @resttek/web-empleados -- --include=src/app/core/auth/employee-access.spec.ts` ejecuta la prueba mínima y termina correctamente; no se cambia el script de tests de la raíz.
   - Evidencia TDD: rojo — el comando focalizado terminó con código 1 por `Missing script: "test"` en el paquete; verde — tras añadir Vitest/jsdom, el target Angular y los tipos, `npm run test -w @resttek/web-empleados -- --include=src/app/core/auth/employee-access.spec.ts` terminó con código 0 (1 archivo, 1 prueba pasada). `npm install` desde la raíz del worktree terminó correctamente y actualizó el lockfile.
 
-- [ ] **T02 (5 min)** Escribir la matriz de permisos y destinos como pruebas fallidas
+- [x] **T02 (5 min)** ~~Escribir la matriz de permisos y destinos como pruebas fallidas~~
   - Acción: ampliar las pruebas parametrizadas para los cuatro roles autorizados, cliente, rol nulo y valor desconocido. Comprobar cada vista y el destino inicial; probar que una vista desconocida no obtiene permiso.
   - Archivos o componentes: `packages/web-empleados/src/app/core/auth/employee-access.spec.ts`; contrato del nuevo `employee-access.ts` en la misma carpeta.
   - Dependencias: T01.
   - Comprobación: el comando focalizado de T01 falla por la política todavía no implementada, no por una avería del runner. Registrar el resultado rojo y las combinaciones cubiertas.
+  - Evidencia TDD: se añadió el contrato tipado y un esqueleto temporal de denegación predeterminada para que el rojo mida aserciones y no un error de importación. `npm run test -w @resttek/web-empleados -- --include=src/app/core/auth/employee-access.spec.ts` terminó con código 1 por 13 aserciones de permisos/destinos autorizados; las 17 restantes pasaron, incluidas las denegaciones para cliente/rol ausente/desconocido y vista desconocida.
 
 - [ ] **T03 (5 min)** Implementar una política local y tipada de acceso
   - Acción: definir el tipo de vista, la matriz de roles y el destino inicial mediante funciones pequeñas en un único módulo local. Denegar valores desconocidos sin recurrir a `any` ni modificar AuthStore; normalizar mediante comprobaciones en el punto de consumo. Usar los valores reales `manager` y `admin`.
