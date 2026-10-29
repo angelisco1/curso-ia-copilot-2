@@ -274,10 +274,11 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T35.
   - Comprobación: signals de sesión/mesa/carga/error, recuperación por restaurante, no mezclar respuestas A/B; recarga reconstruye desde API sin confiar en datos locales. Salir/cambiar restaurante no llama a liberar.
   - Evidencia: rojo: specs no compilaban (`api-error` y `table-session.store` inexistentes). Verde: 30 tests. `TableSessionStore` (solo memoria, sin persistencia) expone `occupation/session/table/sessionId/partySize/loading/error`, `load()` descarta respuestas y errores de peticiones superadas (A/B), cambiar de restaurante descarta la ocupación anterior, la ocupación se oculta si cambia el usuario y no existe operación de liberación. Se añade `core/models/api-error.ts` (+spec) para tratar ambos formatos de error (`{error,message}` y `{error}` heredado) y los códigos de sesión/mesa explícitamente. Incertidumbre documentada: el contrato marca como "a confirmar" el formato exacto del 400 por sesión ausente; el parser admite ambos formatos y reconoce los mensajes literales conocidos.
-- [ ] **T37 (10 min)** Crear paso de número de personas y listado elegible
-  - Archivos: `packages/web-clientes/src/app/features/tables/table-selection.component.{ts,html,css,spec.ts}` (nuevos).
+- [x] **T37 (10 min)** ~~Crear paso de número de personas y listado elegible~~
+  - Archivos: `packages/web-clientes/src/app/features/tables/table-selection.page.{ts,html,css,spec.ts}` (nuevos). Es una pantalla asociada a ruta: se nombra `TableSelectionPage` / `*.page.*` según la convención de pages (corrige el sufijo `.component` del plan original).
   - Dependencias: T35, T36.
   - Comprobación: grupo entero positivo obligatorio, mesas suficientes, lista vacía/carga/error; cambiar grupo invalida selección anterior y descarta respuestas tardías de otra cantidad.
+  - Evidencia: rojo: el spec de la page no compilaba (page inexistente). Verde: 46 tests; grupo `''`, `0`, `-1`, `2.5`, `abc`, `1e2` rechazado sin llamar a la API; listado, carga, vacío y error con reintento; seleccionar no llama a ocupar; cambiar grupo borra lista/selección y descarta respuestas tardías (también si no se vuelve a buscar). Si ya hay ocupación propia se muestra su mesa con acceso a la carta en lugar del formulario. La ruta se registra en T39.
 - [ ] **T38 (10 min)** Confirmar ocupación y tratar conflictos sin navegar
   - Archivos: selección de T37 y sus tests.
   - Dependencias: T37.

@@ -1,0 +1,52 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.party-form,
+.notice {
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.party-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.party-row input {
+  width: 120px;
+}
+.hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 8px;
+}
+.table-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.table-option {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+.table-option.selected {
+  border-color: var(--green-medium);
+  outline: 2px solid var(--green-medium);
+}
+.description {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
