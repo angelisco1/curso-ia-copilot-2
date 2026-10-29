@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Resttek - Empleados y autenticacion
+  version: 1.0.0
+  description: |
+    Documento independiente del contexto employee, incluidos los clientes.
+    Describe las rutas HTTP implementadas; no incluye otros contextos ni /health.
+    Los clientes se almacenan como empleados con rol cliente y restaurantId nulo.
+    Login y registro son publicos. Todas las operaciones de consulta y alta
+    administrativa requieren un JWT con rol admin; manager no tiene acceso.
+    Los textos explicativos estan en espanol y los mensajes de error conservan
+    literalmente el ingles devuelto por la API.
+servers:
+  - url: http://localhost:3000
+    description: Servidor local; el puerto puede cambiar mediante PORT.
+tags:
+  - name: Autenticacion
+    description: Inicio de sesion para todos los roles y registro publico de clientes.
+  - name: Empleados
+    description: Alta y consultas administrativas de usuarios del sistema.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Autenticacion]
+      operationId: iniciarSesionEmpleado
+      summary: Iniciar sesion
+      description: |
+        Acepta cualquier rol, incluido cliente. Busca el email tal como se recibe,
+        sin convertirlo a minusculas ni recortar espacios, y compara la contrasena
+        con bcrypt. No valida previamente el formato del email. Un email no
+        encontrado o una contrasena incorrecta devuelve 401. El JWT contiene id,
+        role y restaurantId, y caduca a las ocho horas. No hay renovacion ni
+        cierre de sesion implementados en este contexto.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: admin@resttek.com
+              password: claveDeEjemplo
+      responses:
+        '200':
+          description: Sesion iniciada; token y datos publicos del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: El email no existe o la contrasena es incorrecta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvalidCredentialsError'
+              example:
+                error: InvalidCredentialsError
+                message: Invalid credentials
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/auth/register:
+    post:
+      tags: [Autenticacion]
+      operationId: registrarCliente
+      summary: Registrar un cliente
+      description: |
+        Crea un usuario y devuelve una sesion. Fuerza role a cliente y restaurantId
+        a null aunque se envien esos campos. Comprueba primero el email duplicado,
+        despues genera el hash bcrypt y valida nombre, apellidos y email.
+        Nombre y apellidos no pueden estar vacios ni contener solo espacios,
+        pero se conservan sin recortar. No se aplica una longitud minima ni una
+        regla de complejidad a la contrasena. Los fallos no controlados de tipos,
+        cuerpo ausente o bcrypt se traducen en 500, no en un 400 de validacion.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterClientRequest'
+            example:
+              firstName: Ana
+              lastName: Garcia
+              email: ana@example.com
+              password: claveDeEjemplo
+      responses:
+        '201':
+          description: Cliente creado, con rol cliente, restaurante nulo y JWT.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientAuthResponse'
+        '400':
+          description: |
+            Error de dominio. El email duplicado devuelve 400, no 409.
+            Posibles errores de entrada: DuplicatedEmailError,
+            FirstNameRequiredError, LastNameRequiredError e InvalidEmailError.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppError'
+              examples:
+                emailDuplicado:
+                  value:
+                    error: DuplicatedEmailError
+                    message: Email is already in use
+                nombreAusente:
+                  value:
+                    error: FirstNameRequiredError
+                    message: First name is required
+                apellidosAusentes:
+                  value:
+                    error: LastNameRequiredError
+                    message: Last name is required
+                emailInvalido:
+                  value:
+                    error: InvalidEmailError
+                    message: Invalid email format
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/employees:
+    post:
+      tags: [Empleados]
+      operationId: crearEmpleado
+      summary: Crear un empleado
+      description: |
+        Solo admin. Permite los cinco roles del sistema, incluido cliente.
+        El rol se normaliza con trim y conversion a minusculas. Comprueba email
+        duplicado antes de generar el hash y validar la entidad. No recorta
+        nombre, apellidos ni email. restaurantId omitido o nulo se guarda como
+        null; no existe una validacion de asignacion segun el rol ni una
+        comprobacion previa de existencia del restaurante en este caso de uso.
+        No hay longitud minima ni complejidad de contrasena. Los fallos de tipos,
+        bcrypt o persistencia no controlados se traducen en 500.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmployeeRequest'
+            example:
+              firstName: Luis
+              lastName: Perez
+              email: luis@example.com
+              password: claveDeEjemplo
+              role: admin
+              restaurantId: null
+      responses:
+        '201':
+          description: Empleado creado; no devuelve token ni hash de contrasena.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: |
+            Error de dominio. Posibles errores de entrada: DuplicatedEmailError,
+            FirstNameRequiredError, LastNameRequiredError, InvalidEmailError e
+            InvalidRoleError. Los emails duplicados devuelven 400, no 409.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppError'
+              examples:
+                emailDuplicado:
+                  value:
+                    error: DuplicatedEmailError
+                    message: Email is already in use
+                nombreAusente:
+                  value:
+                    error: FirstNameRequiredError
+                    message: First name is required
+                apellidosAusentes:
+                  value:
+                    error: LastNameRequiredError
+                    message: Last name is required
+                emailInvalido:
+                  value:
+                    error: InvalidEmailError
+                    message: Invalid email format
+                rolAusente:
+                  value:
+                    error: InvalidRoleError
+                    message: Role must be provided
+                rolInvalido:
+                  value:
+                    error: InvalidRoleError
+                    message: 'Invalid role: supervisor. Must be one of: admin, manager, camarero, cocinero, cliente'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags: [Empleados]
+      operationId: listarEmpleados
+      summary: Listar empleados
+      description: |
+        Solo admin. Devuelve un array sin envoltorio ni total, que tambien puede
+        contener clientes. Aplica LIMIT y OFFSET sin orden explicito.
+        limit y offset se convierten con parseInt sin validacion adicional:
+        un resultado cero o NaN usa 10 y 0 respectivamente. No se rechazan
+        negativos ni se impone un maximo. El filtro role es una igualdad exacta,
+        no se normaliza ni valida; un valor desconocido devuelve un array vacio.
+      parameters:
+        - name: limit
+          in: query
+          description: Tamano de pagina; omitido, cero o no interpretable usa 10.
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          description: Desplazamiento; omitido, cero o no interpretable usa 0.
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: role
+          in: query
+          description: |
+            Filtro exacto opcional. Roles almacenados: admin, manager, camarero,
+            cocinero y cliente. Una cadena vacia no aplica filtro.
+          required: false
+          schema:
+            type: string
+          example: cocinero
+      responses:
+        '200':
+          $ref: '#/components/responses/EmployeeList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/employees/{id}:
+    get:
+      tags: [Empleados]
+      operationId: obtenerEmpleado
+      summary: Consultar un empleado por identificador
+      description: |
+        Solo admin. Busca por igualdad de identificador; no valida su formato
+        UUID. Puede devolver un usuario de cualquier rol, incluido cliente.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identificador del usuario; no se valida su formato.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Datos del empleado encontrado, sin hash de contrasena.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No existe un empleado con ese identificador.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeNotFoundError'
+              example:
+                error: EmployeeNotFoundError
+                message: Employee not found
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/restaurants/{restaurantId}/employees:
+    get:
+      tags: [Empleados]
+      operationId: listarEmpleadosPorRestaurante
+      summary: Listar empleados de un restaurante
+      description: |
+        Solo admin. Filtra por restaurantId sin paginacion ni orden explicito.
+        No valida el formato del identificador ni comprueba si el restaurante
+        existe. Un restaurante inexistente o sin empleados devuelve 200 con [].
+        No aplica una restriccion de restaurante basada en el JWT.
+      parameters:
+        - name: restaurantId
+          in: path
+          required: true
+          description: Identificador del restaurante usado como filtro exacto.
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/EmployeeList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Enviar Authorization con el valor Bearer seguido de un espacio y el JWT.
+        El prefijo Bearer es sensible a mayusculas. Login y registro emiten tokens
+        firmados con caducidad de ocho horas y datos id, role y restaurantId.
+        Las operaciones protegidas de este documento requieren role igual a admin.
+        Un token caducado o con firma invalida devuelve 401; otro rol devuelve 403.
+  schemas:
+    EmployeeRole:
+      type: string
+      description: Rol normalizado almacenado y devuelto por el sistema.
+      enum: [admin, manager, camarero, cocinero, cliente]
+    Employee:
+      type: object
+      description: Usuario del sistema; nunca incluye password ni passwordHash.
+      required: [id, firstName, lastName, email, role, restaurantId]
+      properties:
+        id:
+          type: string
+          description: Identificador generado mediante randomUUID en las altas.
+        firstName:
+          type: string
+          description: Nombre conservado sin recortar espacios.
+        lastName:
+          type: string
+          description: Apellidos conservados sin recortar espacios.
+        email:
+          type: string
+          description: Email conservado sin normalizar.
+        role:
+          $ref: '#/components/schemas/EmployeeRole'
+        restaurantId:
+          type: string
+          nullable: true
+          description: Restaurante asignado, o null si no hay asignacion.
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          description: Email buscado literalmente, sin validacion de formato previa.
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          description: Contrasena en texto plano para comparar con el hash bcrypt.
+    RegisterClientRequest:
+      type: object
+      required: [firstName, lastName, email, password]
+      properties:
+        firstName:
+          type: string
+          pattern: '\S'
+          description: Debe contener al menos un caracter distinto de espacio.
+        lastName:
+          type: string
+          pattern: '\S'
+          description: Debe contener al menos un caracter distinto de espacio.
+        email:
+          type: string
+          pattern: '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+          description: Email unico, sin espacios; no se normaliza.
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          description: Contrasena sin longitud minima ni complejidad impuestas.
+    CreateEmployeeRequest:
+      allOf:
+        - $ref: '#/components/schemas/RegisterClientRequest'
+        - type: object
+          required: [role]
+          properties:
+            role:
+              type: string
+              description: |
+                Tras trim y conversion a minusculas debe ser admin, manager,
+                camarero, cocinero o cliente. Se admite, por ejemplo, ADMIN.
+              example: cocinero
+            restaurantId:
+              type: string
+              nullable: true
+              default: null
+              description: Opcional; omitido o null se convierte en null, sin regla por rol.
+    AuthResponse:
+      type: object
+      required: [token, employee]
+      properties:
+        token:
+          type: string
+          description: JWT con caducidad de ocho horas.
+        employee:
+          $ref: '#/components/schemas/Employee'
+    ClientAuthResponse:
+      allOf:
+        - $ref: '#/components/schemas/AuthResponse'
+        - type: object
+          properties:
+            employee:
+              allOf:
+                - $ref: '#/components/schemas/Employee'
+                - type: object
+                  properties:
+                    role:
+                      type: string
+                      enum: [cliente]
+                    restaurantId:
+                      type: string
+                      nullable: true
+                      enum: [null]
+    AppError:
+      type: object
+      description: Error controlado; contiene el nombre de la clase y su mensaje.
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    InvalidCredentialsError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [InvalidCredentialsError]
+        message:
+          type: string
+          enum: [Invalid credentials]
+    EmployeeNotFoundError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [EmployeeNotFoundError]
+        message:
+          type: string
+          enum: [Employee not found]
+    AuthenticationError:
+      type: object
+      description: Rechazo de autenticacion del middleware; no contiene message.
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum:
+            - 'Unauthorized: No token provided'
+            - 'Unauthorized: Malformed token'
+            - 'Unauthorized: Invalid token'
+    AuthorizationError:
+      type: object
+      description: Rechazo de autorizacion del middleware; no contiene message.
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: ['Forbidden: Insufficient permissions']
+    InternalError:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum: [InternalServerError]
+        message:
+          type: string
+          enum: [Something went wrong]
+  responses:
+    EmployeeList:
+      description: Array de empleados, posiblemente vacio, sin total ni metadatos.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Employee'
+          examples:
+            sinResultados:
+              value: []
+    Unauthorized:
+      description: |
+        Falta la cabecera o el prefijo Bearer exacto (No token provided), falta
+        el token tras el prefijo (Malformed token), o el JWT es invalido o ha
+        caducado (Invalid token). El cuerpo no incluye message.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthenticationError'
+          examples:
+            sinToken:
+              value:
+                error: 'Unauthorized: No token provided'
+            tokenMalformado:
+              value:
+                error: 'Unauthorized: Malformed token'
+            tokenInvalido:
+              value:
+                error: 'Unauthorized: Invalid token'
+    Forbidden:
+      description: JWT verificado, pero su rol no es admin. No incluye message.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthorizationError'
+          example:
+            error: 'Forbidden: Insufficient permissions'
+    InternalServerError:
+      description: |
+        Error no controlado. Tambien se usa para errores de parseo JSON, acceso
+        a un cuerpo ausente, tipos no admitidos por bcrypt o fallos de SQLite;
+        el manejador no convierte esos errores en una respuesta de validacion.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InternalError'
+          example:
+            error: InternalServerError
+            message: Something went wrong
