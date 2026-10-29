@@ -13,7 +13,8 @@ export const SESSION_ERROR_CODES = [
   'TableSessionRequiredError',
   'TableSessionForbiddenError',
   'TableSessionNotFoundError',
-  'TableSessionClosedError'
+  'TableSessionClosedError',
+  'TableSessionMismatchError'
 ] as const
 
 /** Mensajes literales (en inglés) del servidor, por si un error de sesión llegara en formato heredado. */
@@ -22,6 +23,7 @@ const CODE_BY_LEGACY_MESSAGE: Record<string, string> = {
   'The table session does not belong to the client': 'TableSessionForbiddenError',
   'Table session not found': 'TableSessionNotFoundError',
   'The table session is closed': 'TableSessionClosedError',
+  'The order does not match the restaurant or table of the session': 'TableSessionMismatchError',
   'Table is not available': 'TableNotAvailableError',
   'Party size exceeds table capacity': 'TableCapacityExceededError',
   'Client already has an active table session in this restaurant': 'ActiveTableSessionExistsError'
@@ -37,7 +39,8 @@ const MESSAGE_BY_CODE: Record<string, string> = {
   TableSessionRequiredError: 'Necesitas ocupar una mesa antes de hacer el pedido.',
   TableSessionForbiddenError: 'La ocupación de mesa indicada no es tuya.',
   TableSessionNotFoundError: 'No se encontró tu ocupación de mesa.',
-  TableSessionClosedError: 'Tu mesa ha sido liberada. Elige una mesa para continuar.'
+  TableSessionClosedError: 'Tu mesa ha sido liberada. Elige una mesa para continuar.',
+  TableSessionMismatchError: 'El pedido no corresponde a tu mesa actual. Elige una mesa para continuar.'
 }
 
 export function parseApiError(err: unknown): ParsedApiError {

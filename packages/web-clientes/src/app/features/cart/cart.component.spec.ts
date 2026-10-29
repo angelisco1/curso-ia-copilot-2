@@ -78,7 +78,8 @@ describe('CartComponent (envío con mesa y sesión)', () => {
     ['TableSessionClosedError', 409, 'liberada'],
     ['TableSessionNotFoundError', 404, 'No se encontró'],
     ['TableSessionForbiddenError', 403, 'no es tuya'],
-    ['TableSessionRequiredError', 400, 'Necesitas ocupar']
+    ['TableSessionRequiredError', 400, 'Necesitas ocupar'],
+    ['TableSessionMismatchError', 400, 'no corresponde']
   ])('error de sesión %s: comunica el motivo y vuelve a la selección sin reenviar', (code, status, fragment) => {
     orders.createOrder.mockReturnValue(fail(status, { error: code, message: 'x' }))
     submit().click()
