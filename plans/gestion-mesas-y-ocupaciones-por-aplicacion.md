@@ -125,10 +125,11 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
   - Dependencias: T01.
   - Comprobación: tests rechazan estados desconocidos, número/capacidad/grupo cero, negativos, fracciones, strings, null y campos ausentes donde sean obligatorios.
   - Evidencia: rojo con `npx vitest run src/models` (exportaciones como stubs `not implemented`, para que el fallo no sea de importación): 57 tests fallidos por `expected error to be instance of Invalid…Error`/`got 'not implemented'`. Verde: 57/57 en `src/models`; `npm test` 12 archivos / 123 tests en verde. Cubre estados desconocidos (mayúsculas, vacío, null), número/capacidad/grupo 0, negativos, fracciones, strings, null, NaN, ausentes; descripción vacía válida; defaults de creación; id/restaurantId ignorados. `tsc --noEmit` solo muestra los 12 errores previos de `src/scripts/seed.ts` (`Object is possibly 'undefined'`, anteriores a esta tarea; se tratan en T17).
-- [ ] **T04 (10 min)** Añadir esquema de mesas y sesiones con restricciones
+- [x] **T04 (10 min)** ~~Añadir esquema de mesas y sesiones con restricciones~~
   - Archivos: `packages/api/src/config/database.ts`, `config/database.test.ts` (nuevo).
   - Dependencias: T03.
   - Comprobación: SQLite en memoria; FK de restaurante/mesa, unicidad de número activo y de sesiones abiertas; inicializar dos veces no duplica ni destruye datos.
+  - Evidencia: rojo con `npx vitest run src/config`: 12 tests fallidos (`no such table: restaurant_tables`). Verde: 12/12. Se añade `restaurant_tables` y `table_sessions` con CHECK de estado/número/capacidad/grupo, FK a restaurante/mesa, índice único parcial de número entre no borradas y de sesión abierta por mesa y por (restaurante, cliente). Las unicidades las impone SQLite, base de las garantías de atomicidad de T07/T08. `Database` acepta ahora ruta opcional (necesaria para probar reinicialización sobre archivo temporal: datos y 3 índices intactos tras una segunda `initialize`). `npm test` 13 archivos / 135 tests en verde.
 - [ ] **T05 (10 min)** Evolucionar pedidos existentes sin borrar la base
   - Archivos: `packages/api/src/config/database.ts`, `config/database.test.ts`.
   - Dependencias: T04.

@@ -10,7 +10,11 @@ export class Database {
     private db: sqlite3.Database | null = null
     private dbPath: string
 
-    constructor() {
+    constructor(dbPath?: string) {
+        if (dbPath) {
+            this.dbPath = dbPath
+            return
+        }
         const env = process.env.NODE_ENV || 'development'
         if (env === 'test') {
             this.dbPath = ':memory:'
@@ -163,7 +167,41 @@ export class Database {
                 status TEXT NOT NULL,
                 FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
                 FOREIGN KEY(dish_id) REFERENCES dishes(id)
-            )
+            );
+
+            CREATE TABLE IF NOT EXISTS restaurant_tables (
+                id TEXT PRIMARY KEY,
+                restaurant_id TEXT NOT NULL,
+                number INTEGER NOT NULL CHECK (number > 0),
+                description TEXT NOT NULL DEFAULT '',
+                capacity INTEGER NOT NULL CHECK (capacity > 0),
+                status TEXT NOT NULL CHECK (status IN ('libre', 'ocupada', 'reservada')),
+                deleted_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(restaurant_id) REFERENCES restaurants(id)
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tables_active_number
+                ON restaurant_tables(restaurant_id, number) WHERE deleted_at IS NULL;
+
+            CREATE TABLE IF NOT EXISTS table_sessions (
+                id TEXT PRIMARY KEY,
+                restaurant_id TEXT NOT NULL,
+                table_id TEXT NOT NULL,
+                client_id TEXT,
+                party_size INTEGER CHECK (party_size IS NULL OR party_size > 0),
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                FOREIGN KEY(restaurant_id) REFERENCES restaurants(id),
+                FOREIGN KEY(table_id) REFERENCES restaurant_tables(id)
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_table_sessions_open_table
+                ON table_sessions(table_id) WHERE ended_at IS NULL;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_table_sessions_open_client
+                ON table_sessions(restaurant_id, client_id) WHERE ended_at IS NULL AND client_id IS NOT NULL
         `.split(';')
 
         for (const q of queries) {
