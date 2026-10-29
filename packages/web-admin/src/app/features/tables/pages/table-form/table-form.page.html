@@ -1,0 +1,61 @@
+<div class="fade-in">
+  <div class="page-header">
+    <div class="header-back">
+      <a [routerLink]="listUrl" class="back-link" aria-label="Volver al listado de mesas">
+        <lucide-icon name="chevron-left" [size]="18"></lucide-icon>
+      </a>
+      <h1>{{ pageTitle }}</h1>
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="alert-error" role="alert">{{ error() }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="card form-card" novalidate>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="number">Número de mesa</label>
+        <input id="number" type="number" class="form-control" formControlName="number" min="1" step="1" placeholder="1"
+          [attr.aria-invalid]="showError('number')" />
+        @if (showError('number')) {
+          <p class="field-error">El número debe ser un entero positivo.</p>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="capacity">Capacidad</label>
+        <input id="capacity" type="number" class="form-control" formControlName="capacity" min="1" step="1" placeholder="4"
+          [attr.aria-invalid]="showError('capacity')" />
+        @if (showError('capacity')) {
+          <p class="field-error">La capacidad debe ser un entero positivo.</p>
+        }
+      </div>
+
+      <div class="form-group">
+        <label for="description">Descripción (opcional)</label>
+        <input id="description" type="text" class="form-control" formControlName="description" placeholder="Terraza junto a la ventana" />
+      </div>
+
+      <div class="form-group">
+        <label for="status">Estado</label>
+        <select id="status" class="form-control" formControlName="status">
+          @for (s of statuses; track s) {
+            <option [value]="s">{{ statusLabels[s] }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a [routerLink]="listUrl" class="btn btn-secondary">Cancelar</a>
+      <button type="submit" class="btn btn-primary" [disabled]="submitDisabled()">
+        @if (saving()) {
+          Guardando...
+        } @else {
+          Guardar
+        }
+      </button>
+    </div>
+  </form>
+</div>
