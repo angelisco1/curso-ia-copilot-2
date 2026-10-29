@@ -5,6 +5,7 @@ import { LucideAngularModule } from 'lucide-angular'
 import { DishService } from '../../core/services/dish.service'
 import { RestaurantService } from '../../core/services/restaurant.service'
 import { CartStore, Dish } from '../../core/store/cart.store'
+import { TableSessionStore } from '../../core/store/table-session.store'
 import { Restaurant } from '../../core/models/restaurant.model'
 
 @Component({
@@ -17,6 +18,11 @@ import { Restaurant } from '../../core/models/restaurant.model'
         <div>
           <a routerLink="/restaurants" class="back-link">← Volver a restaurantes</a>
           <h1>{{ restaurant()?.name || 'Cargando...' }}</h1>
+          @if (occupation(); as occ) {
+            <p class="table-info" data-testid="table-info">
+              Mesa {{ occ.table.number }}@if (occ.session.partySize) { · {{ occ.session.partySize }} personas }
+            </p>
+          }
         </div>
       </div>
 
@@ -87,6 +93,11 @@ import { Restaurant } from '../../core/models/restaurant.model'
     .container {
       max-width: 1200px;
       margin: 0 auto;
+    }
+    .table-info {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-top: 4px;
     }
     .back-link {
       font-size: 13px;
@@ -212,8 +223,11 @@ export class RestaurantMenuComponent implements OnInit {
   private readonly dishService = inject(DishService)
   private readonly restaurantService = inject(RestaurantService)
   readonly cartStore = inject(CartStore)
+  private readonly sessionStore = inject(TableSessionStore)
 
   readonly restaurant = signal<Restaurant | null>(null)
+  private readonly restaurantId = signal('')
+  readonly occupation = computed(() => this.sessionStore.occupationFor(this.restaurantId()))
   readonly dishes = signal<Dish[]>([])
   readonly loading = signal(true)
   readonly error = signal<string | null>(null)
@@ -234,6 +248,9 @@ export class RestaurantMenuComponent implements OnInit {
 
   ngOnInit(): void {
     const restaurantId = this.route.snapshot.paramMap.get('id')!
+    this.restaurantId.set(restaurantId)
+    const occupation = this.sessionStore.occupationFor(restaurantId)
+    if (occupation) this.cartStore.bindSession(restaurantId, occupation.session.id)
     this.loadData(restaurantId)
   }
 

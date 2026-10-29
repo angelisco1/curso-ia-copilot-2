@@ -289,10 +289,11 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T38.
   - Comprobación: restaurante lleva a `restaurants/:id/tables`; conservar carta en `restaurants/:id`; guard consulta sesión propia y redirige al paso de mesas si no existe, sin bucles. Con sesión existente volver al restaurante permite continuar a su carta sin ocupar de nuevo.
   - Evidencia: rojo: specs de guard/rutas/listado no compilaban (guard inexistente). Verde: 61 tests; `tableSessionGuard` consulta siempre al servidor (true con sesión, `UrlTree` a `/restaurants/:id/tables` con `null` o error), `restaurants/:id/tables` carga `TableSelectionPage` sin guard (sin bucles), `restaurants/:id` conserva la carta con guard, el listado enlaza a `/restaurants/:id/tables`. Con sesión existente, la page de mesas ofrece continuar a la carta sin ocupar de nuevo (T38).
-- [ ] **T40 (10 min)** Vincular carrito y carta a la ocupación activa
+- [x] **T40 (10 min)** ~~Vincular carrito y carta a la ocupación activa~~
   - Archivos: `packages/web-clientes/src/app/core/store/cart.store.ts`, `cart.store.spec.ts` (nuevo), `features/menu/restaurant-menu.component.ts`, `features/cart/cart.component.ts`.
   - Dependencias: T36, T39.
   - Comprobación: mostrar número y grupo; carrito vinculado a restaurante y sessionId; al cambiar de visita no reutiliza productos de la anterior, aunque sea el mismo restaurante. Vaciar carrito tras pedido no borra la sesión.
+  - Evidencia: rojo: `cart.store.spec.ts` no compilaba (`bindSession`/`reset`/`sessionId` inexistentes). Verde: 73 tests; `CartStore.bindSession` vincula restaurante+sesión y vacía productos si cambia la sesión (misma mesa/restaurante incluida) o el restaurante; `clear()` conserva la vinculación; `reset()` la descarta; la carta muestra `Mesa N · X personas` y vincula el carrito al abrirse. La presentación de mesa/grupo en `cart.component.ts` se añade en T41 junto a sus tests.
 - [ ] **T41 (10 min)** Enviar pedido con mesa/sesión y manejar sesión cerrada
   - Archivos: `packages/web-clientes/src/app/core/services/order.service.ts`, `core/models/order.model.ts`, `features/cart/cart.component.ts`, specs nuevos.
   - Dependencias: T02, T40.
