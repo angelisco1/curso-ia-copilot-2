@@ -5,7 +5,7 @@
 - Worktree de implementación: `.vscode/worktrees/21/gestion-mesas`.
 - Rama base: `development` (si no existe, crear desde `main` o, en su defecto, `master`).
 - Validación del nombre: `git check-ref-format --branch 21/gestion-mesas`, correcta durante la planificación.
-- Estado: plan preparado; implementación y comprobaciones funcionales pendientes.
+- Estado: bloque A (API, T01–T17) implementado y verificado localmente; bloques B–E pendientes.
 - Organización: un bloque por aplicación, contratos previos y una integración final. Los identificadores Txx son pasos, no nuevas issues.
 
 ## Objetivo
@@ -194,7 +194,7 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
   - Archivos: `packages/api/src/scripts/seed.ts`; este plan para evidencias.
   - Dependencias: T16.
   - Comprobación: datos deterministas para mesas libres de capacidades 2/4/6, reservada y ocupada manual; nueva semilla no duplica mesas al repetirla. Ejecutar seed solo en una BD de prueba controlada. Ejecutar `npm test` y `npm exec -w @resttek/api -- tsc --noEmit -p tsconfig.json`; registrar resultados.
-  - Evidencia: rojo: `npx vitest run src/scripts` falla por módulo `seed-tables` inexistente. Verde: 4/4 (BD en memoria): mesas deterministas de `rest-1` (nº 1/2/3 libres de capacidad 2/4/6, nº 4 reservada, nº 5 ocupada manual con sesión sin cliente ni grupo) y `rest-2` (3 libres); ids fijos con forma UUID; repetir no duplica ni pisa estados ni recrea mesas borradas; restaurantes inexistentes se omiten. Seed real ejecutado dos veces solo contra una BD temporal creada en el worktree (`packages/api/resttek.db`, ignorada por git y eliminada después): 8 mesas y 1 sesión abierta manual, idénticas tras la segunda ejecución. Hallazgo previo: el seed fallaba en BD nueva con `FOREIGN KEY constraint failed` porque insertaba empleados antes que restaurantes; se movió el insert de restaurantes antes de los empleados (cambio mínimo en `seed.ts`). También se corrigieron los 12 errores previos de `tsc` en `seed.ts` (`!` en índices). Resultados finales: `npm test` 24 archivos / 301 tests en verde; `npm exec -w @resttek/api -- tsc --noEmit -p tsconfig.json` exit 0 sin errores; `npx --yes @apidevtools/swagger-cli validate` válido para `tables.openapi.yaml` y `orders.openapi.yaml`. Aislamiento de transacciones verificado para una conexión SQLite en un único proceso. Pendiente (no verificado): despliegue; confirmación con frontends del 400 `TableSessionMismatchError`. Tras verificar, los contratos `tables.openapi.yaml` y `orders.openapi.yaml` pasan de «PENDIENTE» a «implementado y verificado localmente (no desplegado)» y documentan `TableSessionMismatchError` (400); ambos válidos con swagger-cli y redocly lint (`--extends minimal`); no hay HTML derivado en `packages/api/docs`.
+  - Evidencia: rojo: `npx vitest run src/scripts` falla por módulo `seed-tables` inexistente. Verde: 4/4 (BD en memoria): mesas deterministas de `rest-1` (nº 1/2/3 libres de capacidad 2/4/6, nº 4 reservada, nº 5 ocupada manual con sesión sin cliente ni grupo) y `rest-2` (3 libres); ids fijos con forma UUID; repetir no duplica ni pisa estados ni recrea mesas borradas; restaurantes inexistentes se omiten. Seed real ejecutado dos veces solo contra una BD temporal creada en el worktree (`packages/api/resttek.db`, ignorada por git y eliminada después): 8 mesas y 1 sesión abierta manual, idénticas tras la segunda ejecución. Hallazgo previo: el seed fallaba en BD nueva con `FOREIGN KEY constraint failed` porque insertaba empleados antes que restaurantes; se movió el insert de restaurantes antes de los empleados (cambio mínimo en `seed.ts`). También se corrigieron los 12 errores previos de `tsc` en `seed.ts` (`!` en índices). Resultados finales: `npm test` 24 archivos / 301 tests en verde; `npm exec -w @resttek/api -- tsc --noEmit -p tsconfig.json` exit 0 sin errores; `npx --yes @apidevtools/swagger-cli validate` válido para `tables.openapi.yaml` y `orders.openapi.yaml`. Aislamiento de transacciones verificado para una conexión SQLite en un único proceso. Pendiente (no verificado): despliegue. Revisión del bloque A (segundo agente): `npm test` 25 archivos / 307 tests y `tsc` exit 0; la confirmación del 400 `TableSessionMismatchError` queda resuelta por documentación en la sección «Errores de sesión de `POST /orders`» de este plan y en `orders.openapi.yaml`; los frontends deben consumirla al implementar T41. Tras verificar, los contratos `tables.openapi.yaml` y `orders.openapi.yaml` pasan de «PENDIENTE» a «implementado y verificado localmente (no desplegado)» y documentan `TableSessionMismatchError` (400); ambos válidos con swagger-cli y redocly lint (`--extends minimal`); no hay HTML derivado en `packages/api/docs`.
 
 ### B. Admin — agente Frontend Angular, alcance web-admin
 
@@ -345,6 +345,27 @@ Propiedad: documentación general y seguimiento final. No utilizar esta fase par
 5. Si se ejecutan agentes en paralelo, el coordinador gestiona worktrees derivados e integración en la rama de tarea; no permitir escrituras/commits simultáneos sobre el mismo checkout. Antes de empezar, seguir las reglas de `implement-plan` sobre el worktree de tarea.
 6. No hace falta modificar `web-shared` para este alcance: los servicios/DTOs locales siguen los patrones existentes; una futura extracción compartida requeriría justificarla, no importar desde otra app.
 
+### Errores de sesión de `POST /orders` (contrato para los frontends)
+
+Registrados en `packages/api/docs/orders.openapi.yaml` y cubiertos por `order.routes.test.ts` (T14). Cuerpo `{error: <Clase>, message}`, sin pedido creado, solo para rol `cliente`:
+
+| Situación | HTTP | `error` | `message` |
+| --- | --- | --- | --- |
+| Sin `tableSessionId` | 400 | `TableSessionRequiredError` | A table session is required to place an order |
+| `tableSessionId` inexistente | 404 | `TableSessionNotFoundError` | Table session not found |
+| Sesión de otro cliente | 403 | `TableSessionForbiddenError` | The table session does not belong to the client |
+| `restaurantId` o `tableId` no coinciden con la sesión | 400 | `TableSessionMismatchError` | The order does not match the restaurant or table of the session |
+| Sesión cerrada (liberada, mesa borrada o carrera) | 409 | `TableSessionClosedError` | The table session is closed |
+
+Otros: `restaurantId` ausente sigue siendo el error heredado 400 `{error: 'Restaurant ID is required'}` (sin `message`); sin JWT 401 `{error: 'Unauthorized: ...'}`; fallo inesperado 500. Recomendación a clientes: 400 `TableSessionMismatchError`, 403, 404 y 409 implican contexto de sesión inválido (volver a `GET /restaurants/:id/table-sessions/current` y, si es `null`, al paso de selección de mesa); 400 `TableSessionRequiredError` indica fallo de cliente. Los errores de ocupación (`POST /table-sessions`) y mesas están en `tables.openapi.yaml`: 400 validación, 403 rol/restaurante, 404 mesa/restaurante, 409 `TableNotAvailableError`, `TableCapacityExceededError`, `ActiveTableSessionExistsError`, `TableNumberConflictError`, `TableCapacityConflictError`.
+
+### Revisión del bloque A (segundo agente)
+
+- Verificado: `npm test` 25 archivos / 307 tests y `tsc --noEmit` exit 0 (antes de la revisión 24 / 301).
+- Superficie HTTP contrastada con `table.routes.ts`, `table-session.routes.ts`, `app.ts` y `errorHandler.ts`: paths, `/available` antes de `/:tableId`, `mergeParams`, permisos y mapeo 400/401/403/404/409/500 coinciden con el contrato. No se hallaron huecos de implementación.
+- Hueco de evidencia corregido: faltaban pruebas HTTP directas de CA02/CA03/CA04/CA12/CA14/CA17; añadidas en `src/routes/acceptance.routes.test.ts` (6 tests, verdes al primer intento por probar código previo, sin rojo inicial).
+- No se pudo repetir `swagger-cli`/`redocly` (descarga con `npx` denegada en este entorno); `orders.openapi.yaml` se comprobó solo con parseo YAML tras añadir la tabla de errores.
+
 ## Criterios de aceptación
 
 Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí mencionadas aún no existen.
@@ -354,22 +375,22 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Evidencia: pendiente.
 - [ ] **CA02 — Validación y unicidad.** Número/capacidad/grupo son enteros positivos; los estados válidos son exactamente tres; número duplicado solo se prohíbe entre mesas activas del mismo restaurante.
   - Verificación: matriz 0, -1, 1.5, strings/null/ausente y estado desconocido; mismo número en otro restaurante permitido; duplicado activo 409; capacidad exacta al grupo admitida.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (solo API): `npx vitest run src/routes/acceptance` (`CA02`) 14 cuerpos inválidos (0, -1, 1.5, string, null, ausente en número/capacidad; estado desconocido/mayúsculas) → 400 `{error,message}`; los tres estados válidos aceptados; mismo número en otro restaurante 201; duplicado activo 409 `TableNumberConflictError`; número reutilizable tras borrar; capacidad igual al grupo admitida. Complementa `src/models` (57 tests) y `database.test.ts`. Al ser solo API, el CA no depende de navegador: **completo en API**.
 - [ ] **CA03 — Filtro exacto de disponibilidad.** Para 4 personas se ofrecen libres de capacidad 4 y 6, no capacidad 2, ocupadas, reservadas, borradas ni de otro restaurante.
   - Verificación: prueba de repositorio/API con esas fixtures y selección de cliente en navegador; grupo sin coincidencias muestra vacío explícito.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (API): test `CA03` en `acceptance.routes.test.ts`: capacidades 2/4/6, ocupada, reservada, borrada y otro restaurante; para 4 personas devuelve exactamente las de capacidad 4 y 6; grupo 7 → `[]`. Falta la selección de cliente en navegador (bloque D).
 - [ ] **CA04 — Momento de ocupación.** Indicar grupo/listar/seleccionar no ocupa; continuar con éxito abre una sesión, marca ocupada y lleva a carta.
   - Verificación: consultar mesa antes y después; test HTTP y componente con spy del POST; continuar inválido no llama API.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (API): test `CA04`: consultar disponibilidad dos veces y `current` no ocupan (mesa `libre`, `activeSessionId` null); `partySize: 0` → 400 sin cambios; confirmar → 201, mesa `ocupada` con `activeSessionId` de la sesión y desaparece de disponibilidad. Falta el spy del POST en componente y la navegación a carta (bloque D).
 - [ ] **CA05 — Conflicto concurrente y reintento.** Dos clientes no consiguen ocupar la misma mesa; reintentar el ganador no duplica sesión y un fallo no deja estado parcial.
   - Verificación: dos peticiones concurrentes, una creación y un conflicto; contar una sesión abierta, repetir confirmación y comprobar mismo id; inyectar fallo y comprobar rollback.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia (API): `table-session.repository.test.ts` (T07): dos clientes por una mesa → 1 ganador + 1 `TableNotAvailableError`; 10 simultáneos → 1 sesión abierta; reintento del ganador → `created:false` con el mismo id; fallos inyectados (INSERT duplicado, `disk I/O error` tras el UPDATE) → rollback con mesa libre y sin sesión huérfana; HTTP: 201 y 200 del reintento en `table-session.routes.test.ts`. Comprobado en `npm test` 307/307. **Completo (API)**.
 - [ ] **CA06 — Recuperación sin liberación automática.** Recargar, salir o cambiar restaurante conserva sesión en servidor y al volver se recupera la mesa.
   - Verificación: navegador con recarga completa y vuelta desde otro restaurante; GET current devuelve misma sesión; ninguna petición de liberación desde cliente.
   - Evidencia: pendiente.
 - [ ] **CA07 — Acceso directo y contexto obsoleto.** No se puede pedir sin sesión propia abierta ni usar sesión cerrada, borrada, ajena o de otro restaurante.
   - Verificación: URL directa a carta sin sesión redirige; POST manipulado devuelve error; liberar desde empleados y volver a cliente impide pedido; cubrir carrera entre cierre y creación.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (API): `order.routes.test.ts`: sin sesión 400, inexistente 404, ajena 403, restaurante/mesa distintos 400, cerrada 409 sin crear pedido; sesión de mesa borrada 409; carrera liberar vs pedir (cada pedido 201 o 409, ninguno posterior al cierre); `order.repository.test.ts` T12 con SQLite real. Falta la redirección de URL directa a carta y el recorrido liberar→volver en navegador (bloques C/D).
 - [ ] **CA08 — Envío a cocina y barra.** Nuevo pedido guarda mesa/sesión correctas; comida aparece en cocina y bebida en barra, conservando estados por unidad.
   - Verificación: pedido con 2 comidas y 1 bebida produce tres ítems `pendiente`; preparar/listo/entregar desde las apps sin pérdidas.
   - Evidencia: pendiente.
@@ -378,19 +399,19 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Evidencia: pendiente.
 - [ ] **CA10 — Visita actual aislada.** Mesa ocupada muestra sus pedidos/estados, incluidos entregados, pero no los de sesiones anteriores.
   - Verificación: sesiones A y B sucesivas de una mesa con pedidos en ambas; detalle B solo contiene ids de B; ocupada manual sin pedidos muestra vacío.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (API): T16 (sesiones A y B sucesivas: detalle de B sin pedidos de A, entregados incluidos en `order.repository.test.ts`) y test `CA17` de `acceptance.routes.test.ts` (ocupada manual sin pedidos → `[]`). Falta verlo en el salón (bloque C).
 - [ ] **CA11 — Liberación con pendientes.** Se permite liberar con pedidos pendientes sin cancelarlos, entregarlos ni mostrarlos en la siguiente visita.
   - Verificación: liberar A pendiente, ocupar B y comprobar que A sigue en cocina/barra/panel de entregas identificado como anterior; nueva petición de A se rechaza.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (API): T16 `order.routes.test.ts`: liberar A con pendientes, ocupar B; A sigue en `/orders/active` con `tableSessionEndedAt`/`tableNumber`, procesable por cocina (204), y su nueva petición se rechaza 409; la mesa de B no lista pedidos de A. Falta comprobar cocina/barra/panel de entregas en empleados (bloque C).
 - [ ] **CA12 — Historial tras borrado.** Borrar oculta la mesa, cierra su ocupación y conserva sesiones, pedidos e ítems históricos.
   - Verificación: consulta de pedido anterior sigue funcionando; disponibilidad/listados no incluyen mesa; recrear mismo número obtiene id nuevo y no hereda pedidos.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia (API): T16 (borrado 204, mesa 404, sesión cerrada conservada, pedido e ítems conservados) y test `CA12` de `acceptance.routes.test.ts`: tras borrar, listado y disponibilidad vacíos; recrear el número da id nuevo, su detalle de pedidos es `[]` y el pedido antiguo conserva `tableId`/`tableSessionId` originales. **Completo (API)**.
 - [ ] **CA13 — Autorización y pertenencia.** Solo admin dispone de CRUD; manager/camarero solo cambian mesas de su restaurante; cliente solo opera su ocupación.
   - Verificación: matriz HTTP por rol/restaurante, sin JWT y con ids cruzados; 401/403/404 según contrato; manager bloqueado en URL de CRUD admin; disponibilidad sin datos personales.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia (API): `table.routes.test.ts` y `table-session.routes.test.ts` (T15, 40 pruebas HTTP): solo admin CRUD (manager/camarero/cocinero/cliente 403), manager/camarero de otro restaurante 403, ids cruzados 404 incluso para admin, sin JWT/token inválido 401, personal sin acceso a disponibilidad/ocupación, disponibilidad sin identidad ni estado. Mutación temporal documentada en T15. Falta el bloqueo por URL directa del manager en admin (bloque B), por lo que el CA queda **completo en API, parcial global**.
 - [ ] **CA14 — Compatibilidad de datos existentes.** Inicializar una BD anterior añade esquema sin borrar datos y pedidos sin sesión siguen consultables/preparables/entregables.
   - Verificación: fixture del esquema previo, evolución y segunda inicialización; comparar ids/ítems antes/después; pruebas de listados antiguos y panel de entregas.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia parcial (API): `database.test.ts` (T05): fixture del esquema previo, columna añadida una vez con `PRAGMA table_info`, ids/ítems intactos y reapertura sin repetir; test `CA14` de `acceptance.routes.test.ts`: pedido sin sesión (`mesa-7`) aparece en `/orders/active` con campos de sesión `null`, avanza `preparando→listo→entregado` (204), `mine` y `GET /:id` lo devuelven y sale de activos al entregarse. Falta el panel de entregas en empleados (bloque C).
 - [ ] **CA15 — Carrito y usuario aislados.** Carrito de otra visita/restaurante no se envía en la nueva; enviar un pedido no pierde la ocupación; otro usuario no hereda sesión local.
   - Verificación: tests de store y recorrido cambiar restaurante/visita, confirmar y pedir de nuevo; logout/login con usuario distinto.
   - Evidencia: pendiente.
@@ -399,7 +420,7 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Evidencia: pendiente.
 - [ ] **CA17 — Capacidad y cambios administrativos coherentes.** No se reduce capacidad por debajo del grupo activo; PUT, PATCH y borrado mantienen el ciclo de sesiones.
   - Verificación: grupo 4, intentar capacidad 2 devuelve 409; capacidad 4 válida; cambiar ocupada a reservada cierra sesión; repetir ocupada no abre otra.
-  - Evidencia: pendiente.
+  - Evidencia: Evidencia (API): test `CA17` de `acceptance.routes.test.ts`: grupo 4 en mesa de 6, PUT capacidad 2 → 409 `TableCapacityConflictError`, capacidad 4 → 200; repetir `ocupada` mantiene una sola sesión; `ocupada→reservada` cierra la sesión (`activeSessionId` null, `current` null); `reservada→ocupada` manual abre otra sin pedidos. Borrado: T08/T16. **Completo (API)**; los avisos en admin/empleados corresponden a B/C.
 - [ ] **CA18 — Validación técnica y documentación.** Tests, tipos y builds afectados pasan; documentación describe el flujo real.
   - Verificación: `npm test`; `npm exec -w @resttek/api -- tsc --noEmit -p tsconfig.json`; `npm run test -w @resttek/web-admin`; `npm run test -w @resttek/web-empleados`; `npm run test -w @resttek/web-clientes` tras T34; build de cada una de las tres apps; revisión de enlaces y recorrido documentado.
   - Evidencia: pendiente.
