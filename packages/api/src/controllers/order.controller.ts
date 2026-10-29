@@ -1,23 +1,29 @@
-import type { Request, Response } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import type { OrderService } from '@services/order.service.js'
+import { AppError } from '@errors/AppError.js'
 
 export class OrderController {
     constructor(private readonly orderService: OrderService) {}
 
-    async createOrder(req: Request, res: Response): Promise<void> {
+    async createOrder(req: Request, res: Response, next?: NextFunction): Promise<void> {
         try {
-            const { restaurantId, tableId, items } = req.body
+            const { restaurantId, tableId, tableSessionId, items } = req.body
             const user = (req as any).user
             const clientId = user?.id ?? null
             const order = await this.orderService.create({
                 restaurantId,
                 tableId: tableId ?? null,
                 clientId,
+                actorRole: typeof user?.role === 'string' ? user.role : null,
+                tableSessionId: typeof tableSessionId === 'string' ? tableSessionId : null,
                 items
             })
             res.status(201).json(order)
         } catch (error) {
-            if (error instanceof Error) {
+            if (next && error instanceof AppError && error.name.startsWith('TableSession')) {
+                // Errores nuevos de sesion: formato {error, message} del errorHandler.
+                next(error)
+            } else if (error instanceof Error) {
                 res.status(400).json({ error: error.message })
             } else {
                 res.status(500).json({ error: 'Internal Server Error' })
