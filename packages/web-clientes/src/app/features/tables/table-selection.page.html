@@ -7,6 +7,10 @@
     </div>
   </div>
 
+  @if (actionError(); as message) {
+    <div class="alert-error" role="alert" data-testid="action-error">{{ message }}</div>
+  }
+
   @if (sessionStore.loading() && !existing()) {
     <div class="spinner" data-testid="checking" role="status" aria-label="Comprobando tu mesa"></div>
   } @else if (existing(); as current) {
@@ -83,6 +87,16 @@
             </li>
           }
         </ul>
+        <div class="actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-testid="confirm"
+            [disabled]="selectedTable() === null || saving()"
+            (click)="confirm()">
+            @if (saving()) { Guardando... } @else { Continuar a la carta }
+          </button>
+        </div>
       }
     }
   }

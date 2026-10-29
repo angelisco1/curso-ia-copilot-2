@@ -279,10 +279,11 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T35, T36.
   - Comprobación: grupo entero positivo obligatorio, mesas suficientes, lista vacía/carga/error; cambiar grupo invalida selección anterior y descarta respuestas tardías de otra cantidad.
   - Evidencia: rojo: el spec de la page no compilaba (page inexistente). Verde: 46 tests; grupo `''`, `0`, `-1`, `2.5`, `abc`, `1e2` rechazado sin llamar a la API; listado, carga, vacío y error con reintento; seleccionar no llama a ocupar; cambiar grupo borra lista/selección y descarta respuestas tardías (también si no se vuelve a buscar). Si ya hay ocupación propia se muestra su mesa con acceso a la carta en lugar del formulario. La ruta se registra en T39.
-- [ ] **T38 (10 min)** Confirmar ocupación y tratar conflictos sin navegar
+- [x] **T38 (10 min)** ~~Confirmar ocupación y tratar conflictos sin navegar~~
   - Archivos: selección de T37 y sus tests.
   - Dependencias: T37.
   - Comprobación: seleccionar no muta estado; continuar sin selección bloqueado; una petición mientras guarda; 201/200 guarda sesión y navega a carta, 409 muestra aviso y refresca/reconcilia sin elegir otra mesa automáticamente.
+  - Evidencia: rojo: `confirm`/`saving` inexistentes (errores TS2339 en el spec). Verde: 53 tests; continuar bloqueado sin selección, 201/200 guardan sesión y navegan a `/restaurants/:id`, doble clic = una sola petición, 409 (formato nuevo y heredado) avisa sin navegar, reconcilia con `GET current` y refresca la lista sin elegir mesa; `ActiveTableSessionExistsError` muestra la sesión existente; fallo de red conserva la selección para reintentar.
 - [ ] **T39 (10 min)** Conectar listado, rutas y acceso directo a carta
   - Archivos: `packages/web-clientes/src/app/app.routes.ts`, `features/restaurants/restaurant-list.component.ts`, `core/guards/table-session.guard.ts` (nuevo), specs de rutas/guard.
   - Dependencias: T38.
