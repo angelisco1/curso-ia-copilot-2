@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core'
 import { AuthStore } from '@resttek/web-shared'
-import { Observable, defer, tap } from 'rxjs'
+import { Observable, catchError, defer, map, of, tap } from 'rxjs'
 import { TableService } from '../services/table.service'
 import { TableOccupation } from '../models/table.model'
 import { describeTableError, parseApiError } from '../models/api-error'
@@ -65,6 +65,17 @@ export class TableSessionStore {
         })
       )
     })
+  }
+
+  /**
+   * Comprueba en el servidor si la sesión indicada sigue vigente.
+   * 'closed' = ya no hay ocupación o es otra; 'unknown' = no se pudo comprobar (el servidor validará al enviar).
+   */
+  revalidate(restaurantId: string, sessionId: string): Observable<'valid' | 'closed' | 'unknown'> {
+    return this.load(restaurantId).pipe(
+      map(occupation => (occupation && occupation.session.id === sessionId ? 'valid' : 'closed') as 'valid' | 'closed'),
+      catchError(() => of('unknown' as const))
+    )
   }
 
   /** Guarda la ocupación confirmada por el servidor. */

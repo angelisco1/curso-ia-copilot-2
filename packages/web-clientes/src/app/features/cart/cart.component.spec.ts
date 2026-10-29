@@ -7,9 +7,14 @@ import { TableService } from '../../core/services/table.service'
 import { CartStore, Dish } from '../../core/store/cart.store'
 import { TableSessionStore } from '../../core/store/table-session.store'
 import { Order } from '../../core/models/order.model'
+import { TableOccupation } from '../../core/models/table.model'
 
 const dish: Dish = { id: 'd-1', name: 'Paella', description: null, price: 10, category: 'Principal', available: true, restaurantId: 'r-1', ingredients: [] }
 const order = { id: 'o-1', restaurantId: 'r-1', tableId: 't-1', clientId: 'c', createdAt: '', items: [] } as Order
+const occupation: TableOccupation = {
+  session: { id: 's-1', restaurantId: 'r-1', tableId: 't-1', clientId: 'c', partySize: 3, startedAt: '', endedAt: null },
+  table: { id: 't-1', restaurantId: 'r-1', number: 7, description: '', capacity: 4, status: 'ocupada', activeSessionId: 's-1' }
+}
 
 describe('CartComponent (envío con mesa y sesión)', () => {
   let fixture: ComponentFixture<CartComponent>
@@ -28,16 +33,13 @@ describe('CartComponent (envío con mesa y sesión)', () => {
       providers: [
         provideRouter([]),
         { provide: OrderService, useValue: orders },
-        { provide: TableService, useValue: { getCurrent: () => of(null) } }
+        { provide: TableService, useValue: { getCurrent: () => of(occupation) } }
       ]
     })
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true) as unknown as ReturnType<typeof vi.fn>
     cart = TestBed.inject(CartStore)
     sessions = TestBed.inject(TableSessionStore)
-    sessions.setOccupation({
-      session: { id: 's-1', restaurantId: 'r-1', tableId: 't-1', clientId: 'c', partySize: 3, startedAt: '', endedAt: null },
-      table: { id: 't-1', restaurantId: 'r-1', number: 7, description: '', capacity: 4, status: 'ocupada', activeSessionId: 's-1' }
-    })
+    sessions.setOccupation(occupation)
     cart.bindSession('r-1', 's-1')
     cart.addItem(dish, 2)
     fixture = TestBed.createComponent(CartComponent)
@@ -125,5 +127,58 @@ describe('CartComponent (envío con mesa y sesión)', () => {
     submit().click()
     expect(orders.createOrder).not.toHaveBeenCalled()
     expect(navigate.mock.calls[0][0]).toEqual(['/restaurants', 'r-1', 'tables'])
+  })
+})
+
+describe('CartComponent (revalidación al volver)', () => {
+  function setup(getCurrent: () => Observable<TableOccupation | null>) {
+    const orders = { createOrder: vi.fn() }
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: OrderService, useValue: orders },
+        { provide: TableService, useValue: { getCurrent } }
+      ]
+    })
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true)
+    const cart = TestBed.inject(CartStore)
+    const sessions = TestBed.inject(TableSessionStore)
+    sessions.setOccupation(occupation)
+    cart.bindSession('r-1', 's-1')
+    cart.addItem(dish)
+    const fixture = TestBed.createComponent(CartComponent)
+    fixture.detectChanges()
+    return { fixture, cart, sessions, orders, navigate }
+  }
+
+  it('con la misma sesión abierta en el servidor, recupera y conserva el carrito', () => {
+    const { cart, navigate } = setup(() => of(occupation))
+    expect(navigate).not.toHaveBeenCalled()
+    expect(cart.items().length).toBe(1)
+  })
+
+  it('si la sesión fue liberada o la mesa borrada, descarta el contexto y vuelve a selección', () => {
+    const { cart, sessions, navigate, orders } = setup(() => of(null))
+    expect(navigate).toHaveBeenCalledTimes(1)
+    const [commands, extras] = navigate.mock.calls[0] as unknown as [string[], { state: { notice: string } }]
+    expect(commands).toEqual(['/restaurants', 'r-1', 'tables'])
+    expect(extras.state.notice).toContain('liberada')
+    expect(cart.sessionId()).toBeNull()
+    expect(cart.items()).toEqual([])
+    expect(sessions.occupation()).toBeNull()
+    expect(orders.createOrder).not.toHaveBeenCalled()
+  })
+
+  it('si ahora existe otra sesión distinta, no se usa el contexto obsoleto', () => {
+    const other: TableOccupation = { ...occupation, session: { ...occupation.session, id: 's-2' } }
+    const { cart, navigate } = setup(() => of(other))
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(cart.sessionId()).toBeNull()
+  })
+
+  it('si no se puede comprobar (red) no descarta el carrito y el servidor validará al enviar', () => {
+    const { cart, navigate } = setup(() => throwError(() => ({ status: 0, error: null })))
+    expect(navigate).not.toHaveBeenCalled()
+    expect(cart.items().length).toBe(1)
   })
 })

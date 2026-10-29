@@ -1,4 +1,5 @@
-import { Injectable, signal, computed } from '@angular/core'
+import { Injectable, signal, computed, inject, effect, untracked } from '@angular/core'
+import { AuthStore } from '@resttek/web-shared'
 
 export interface Dish {
   id: string
@@ -22,6 +23,20 @@ export class CartStore {
   private readonly _items = signal<CartItem[]>([])
   private readonly _restaurantId = signal<string | null>(null)
   private readonly _sessionId = signal<string | null>(null)
+
+  private readonly auth = inject(AuthStore)
+  private owner: string | null | undefined = undefined
+
+  constructor() {
+    // El carrito pertenece a un usuario: logout o cambio de usuario lo descarta.
+    effect(() => {
+      const id = this.auth.user()?.id ?? null
+      untracked(() => {
+        if (this.owner !== undefined && this.owner !== id) this.reset()
+        this.owner = id
+      })
+    })
+  }
 
   readonly items = this._items.asReadonly()
   readonly restaurantId = this._restaurantId.asReadonly()

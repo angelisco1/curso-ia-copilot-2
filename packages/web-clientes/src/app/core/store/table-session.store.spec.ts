@@ -162,4 +162,35 @@ describe('TableSessionStore', () => {
     first.next(occ('r-1'))
     expect(store.occupation()).toBeNull()
   })
+
+  describe('revalidate', () => {
+    it('devuelve valid si el servidor confirma la misma sesión', () => {
+      service.getCurrent.mockReturnValue(of(occ('r-1', 's-1')))
+      let result: string | undefined
+      store.revalidate('r-1', 's-1').subscribe(r => (result = r))
+      expect(result).toBe('valid')
+    })
+
+    it('devuelve closed si el servidor responde null (liberada o mesa borrada)', () => {
+      service.getCurrent.mockReturnValue(of(null))
+      let result: string | undefined
+      store.revalidate('r-1', 's-1').subscribe(r => (result = r))
+      expect(result).toBe('closed')
+      expect(store.occupation()).toBeNull()
+    })
+
+    it('devuelve closed si ahora hay otra sesión distinta', () => {
+      service.getCurrent.mockReturnValue(of(occ('r-1', 's-2')))
+      let result: string | undefined
+      store.revalidate('r-1', 's-1').subscribe(r => (result = r))
+      expect(result).toBe('closed')
+    })
+
+    it('devuelve unknown ante un error de red sin lanzar', () => {
+      service.getCurrent.mockReturnValue(throwError(() => ({ status: 0, error: null })))
+      let result: string | undefined
+      store.revalidate('r-1', 's-1').subscribe(r => (result = r))
+      expect(result).toBe('unknown')
+    })
+  })
 })

@@ -1,5 +1,5 @@
-import { Component, inject, OnInit, signal, computed } from '@angular/core'
-import { ActivatedRoute, RouterLink } from '@angular/router'
+import { Component, HostListener, inject, OnInit, signal, computed } from '@angular/core'
+import { ActivatedRoute, Router, RouterLink } from '@angular/router'
 import { DecimalPipe } from '@angular/common'
 import { LucideAngularModule } from 'lucide-angular'
 import { DishService } from '../../core/services/dish.service'
@@ -224,6 +224,7 @@ export class RestaurantMenuComponent implements OnInit {
   private readonly restaurantService = inject(RestaurantService)
   readonly cartStore = inject(CartStore)
   private readonly sessionStore = inject(TableSessionStore)
+  private readonly router = inject(Router)
 
   readonly restaurant = signal<Restaurant | null>(null)
   private readonly restaurantId = signal('')
@@ -291,8 +292,34 @@ export class RestaurantMenuComponent implements OnInit {
   }
 
   addToCart(dish: Dish): void {
+    const occupation = this.occupation()
+    if (!occupation) {
+      // Sin ocupación vigente no se acumulan productos: se vuelve a elegir mesa.
+      this.leaveToTables('Tu ocupación ya no está activa. Elige una mesa para continuar.')
+      return
+    }
     const quantity = this.getQuantity(dish.id)
     this.cartStore.addItem(dish, quantity)
     this.quantities.update(q => ({ ...q, [dish.id]: 1 }))
+  }
+
+  /** Al volver a la pestaña se reconfirma en el servidor que la ocupación sigue vigente. */
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+    const sessionId = this.sessionStore.sessionId()
+    const restaurantId = this.restaurantId()
+    if (!sessionId || !restaurantId) return
+    this.sessionStore.revalidate(restaurantId, sessionId).subscribe(result => {
+      if (result === 'closed') {
+        this.leaveToTables('Tu ocupación ha sido liberada. Elige una mesa para continuar.')
+      }
+    })
+  }
+
+  private leaveToTables(notice: string): void {
+    this.sessionStore.clear()
+    this.cartStore.reset()
+    this.router.navigate(['/restaurants', this.restaurantId(), 'tables'], { state: { notice } })
   }
 }

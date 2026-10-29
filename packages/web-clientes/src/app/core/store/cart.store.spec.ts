@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing'
+import { AuthStore } from '@resttek/web-shared'
 import { CartStore, Dish } from './cart.store'
 
 function dish(id: string, restaurantId = 'r-1', price = 10): Dish {
@@ -79,5 +80,45 @@ describe('CartStore', () => {
     expect(cart.items()).toEqual([])
     expect(cart.sessionId()).toBeNull()
     expect(cart.restaurantId()).toBeNull()
+  })
+})
+
+describe('CartStore y usuario autenticado', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    TestBed.configureTestingModule({})
+  })
+
+  it('al cerrar sesión o entrar otro usuario no hereda productos ni sesión', () => {
+    const auth = TestBed.inject(AuthStore)
+    auth.setSession('t1', { id: 'c-1', role: 'cliente' })
+    const cart = TestBed.inject(CartStore)
+    TestBed.tick()
+    cart.bindSession('r-1', 's-1')
+    cart.addItem(dish('a'))
+
+    auth.clearSession()
+    TestBed.tick()
+    expect(cart.items()).toEqual([])
+    expect(cart.sessionId()).toBeNull()
+
+    auth.setSession('t2', { id: 'c-2', role: 'cliente' })
+    TestBed.tick()
+    cart.bindSession('r-1', 's-2')
+    cart.addItem(dish('b'))
+    auth.setSession('t3', { id: 'c-3', role: 'cliente' })
+    TestBed.tick()
+    expect(cart.items()).toEqual([])
+  })
+
+  it('no vacía el carrito mientras sea el mismo usuario', () => {
+    const auth = TestBed.inject(AuthStore)
+    auth.setSession('t1', { id: 'c-1', role: 'cliente' })
+    const cart = TestBed.inject(CartStore)
+    TestBed.tick()
+    cart.bindSession('r-1', 's-1')
+    cart.addItem(dish('a'))
+    TestBed.tick()
+    expect(cart.items().length).toBe(1)
   })
 })

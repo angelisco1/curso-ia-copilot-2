@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core'
+import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core'
 import { Router, RouterLink } from '@angular/router'
 import { DecimalPipe } from '@angular/common'
 import { CartStore } from '../../core/store/cart.store'
@@ -180,7 +180,7 @@ import { describeTableError, isSessionErrorCode, parseApiError } from '../../cor
     }
   `]
 })
-export class CartComponent {
+export class CartComponent implements OnInit {
   readonly cartStore = inject(CartStore)
   private readonly sessionStore = inject(TableSessionStore)
   private readonly orderService = inject(OrderService)
@@ -193,6 +193,25 @@ export class CartComponent {
     const occupation = restaurantId ? this.sessionStore.occupationFor(restaurantId) : null
     return occupation && occupation.session.id === this.cartStore.sessionId() ? occupation : null
   })
+
+  /** Al abrir el carrito se reconfirma la visita en el servidor (el estado local no es autoridad). */
+  ngOnInit(): void {
+    const restaurantId = this.cartStore.restaurantId()
+    const sessionId = this.cartStore.sessionId()
+    if (!restaurantId || !sessionId) return
+    this.sessionStore.revalidate(restaurantId, sessionId).subscribe(result => {
+      if (result === 'closed') {
+        this.backToTableSelection(restaurantId, describeTableError(
+          { status: null, code: 'TableSessionClosedError', message: null }, ''
+        ))
+      }
+    })
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') this.ngOnInit()
+  }
 
   increment(dishId: string): void {
     const item = this.cartStore.items().find(i => i.dish.id === dishId)
