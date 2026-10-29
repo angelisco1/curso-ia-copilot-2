@@ -75,11 +75,12 @@ El usuario ha confirmado que un camarero o cocinero que solicite una vista no pe
   - Comprobación: todas las pruebas de T02 pasan; las nueve combinaciones de camarero/cocinero/manager y las tres de admin coinciden con la matriz del objetivo.
   - Evidencia TDD: verde — `npm run test -w @resttek/web-empleados -- --include=src/app/core/auth/employee-access.spec.ts` terminó con código 0 (30 pruebas pasadas). Se verificaron los doce permisos de camarero/cocinero/manager/admin, los destinos iniciales, roles cliente/nulo/desconocido y la denegación de una vista desconocida.
 
-- [ ] **T04 (10 min)** Reproducir el bypass con pruebas de navegación del router
+- [x] **T04 (10 min)** ~~Reproducir el bypass con pruebas de navegación del router~~
   - Acción: añadir specs con TestBed y RouterTestingHarness, o utilidades equivalentes del router instalado, ejercitando la configuración real de rutas y sustituyendo únicamente servicios externos. Cubrir las doce combinaciones de los cuatro roles y tres rutas, navegación entre hermanas con el shell activo, `/`, ausencia de sesión y roles no admitidos. Espiar la activación del componente restringido y las llamadas a su store para demostrar que no llega a inicializarse.
   - Archivos o componentes: nuevo `packages/web-empleados/src/app/app.routes.spec.ts`; `app.routes.ts` como configuración bajo prueba, AuthStore y dobles de servicios/store de pedidos.
   - Dependencias: T03.
   - Comprobación: `npm run test -w @resttek/web-empleados -- --include=src/app/app.routes.spec.ts` reproduce en rojo el acceso de camarero a cocina, el de cocinero a barra/salón y la entrada inicial incorrecta del camarero; los accesos ya permitidos siguen funcionando.
+  - Evidencia TDD: rojo — el comando focalizado terminó con código 1 por 17 aserciones fallidas y 24 pruebas pasadas (sin fallos de compilación o infraestructura). Reproduce las tres rutas restringidas, redirecciones iniciales incorrectas para camarero/manager/admin, los nueve accesos de roles no admitidos y dos navegaciones entre rutas hermanas; las rutas permitidas y sesiones sin token pasan.
 
 - [ ] **T05 (10 min)** Proteger todas las rutas hijas y corregir la entrada inicial
   - Acción: añadir un guard funcional local de rutas hijas que consulte la política, compruebe sesión y devuelva `UrlTree` al denegar, sin navegación imperativa. Conectarlo con `canActivateChild` para cubrir también cambios entre vistas con el shell activo. Sustituir el redirect fijo del hijo vacío por una redirección dependiente de la misma política, utilizando las capacidades del router instalado. Conservar `authGuard` del padre, las rutas de login y not-found y el lazy loading.

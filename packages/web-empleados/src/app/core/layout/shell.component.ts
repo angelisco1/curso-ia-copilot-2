@@ -2,6 +2,7 @@ import { Component, inject, computed } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { AuthService, AuthStore } from '@resttek/web-shared';
+import { getInitialRoute } from '../auth/employee-access';
 
 @Component({
   selector: 'app-shell',
@@ -19,25 +20,19 @@ export class ShellComponent {
   readonly userRestaurantId = computed(() => this.authStore.user()?.restaurantId)
   readonly hasRestaurant = computed(() => !!this.authStore.user()?.restaurantId)
 
-  readonly canSeeCocina = computed(() => 
-    this.userRole() === 'cocinero' || this.userRole() === 'manager'
+  readonly canSeeCocina = computed(() =>
+    this.userRole() === 'cocinero' || this.userRole() === 'manager' || this.userRole() === 'admin'
   )
 
-  readonly canSeeBarra = computed(() => 
-    this.userRole() === 'camarero' || this.userRole() === 'manager'
+  readonly canSeeBarra = computed(() =>
+    this.userRole() === 'camarero' || this.userRole() === 'manager' || this.userRole() === 'admin'
   )
 
-  readonly canSeeSalon = computed(() => 
-    this.userRole() === 'camarero' || this.userRole() === 'manager'
+  readonly canSeeSalon = computed(() =>
+    this.userRole() === 'camarero' || this.userRole() === 'manager' || this.userRole() === 'admin'
   )
 
-  readonly defaultRoute = computed(() => {
-    const role = this.userRole()
-    if (role === 'cocinero') return '/cocina'
-    if (role === 'manager') return '/cocina'
-    if (role === 'camarero') return '/barra'
-    return '/login'
-  })
+  readonly defaultRoute = computed(() => getInitialRoute(this.userRole()))
 
   logout(): void {
     this.authService.logout()
