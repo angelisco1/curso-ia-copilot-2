@@ -190,10 +190,11 @@ Propiedad: `packages/web-admin/**`. No modificar API, otros frontends ni documen
   - Dependencias: T01.
   - Comprobación: HttpTestingController verifica paths con restaurante, métodos CRUD, DTOs y propagación de conflictos; sin importar tipos de otras apps.
   - Evidencia (agente admin, rama `21/gestion-mesas-admin`): contrato leído de `packages/api/docs/tables.openapi.yaml` (solo lectura, no incluido en commits). Rojo: con modelo y servicio esqueleto que lanza `not implemented`, `npm run test -w @resttek/web-admin -- --include '**/table.service.spec.ts'` → 6 de 6 tests fallan con `Error: not implemented`. Verde: tras implementar `TableService` (GET lista/uno, POST, PUT, DELETE bajo `/restaurants/:id/tables`), suite admin completa `npm run test -w @resttek/web-admin` → 5 archivos, 19 tests pasan (13 previos + 6). El 409 se propaga con `status` y cuerpo `{error,message}`. No se usa PATCH ni endpoints de otras apps.
-- [ ] **T19 (10 min)** Añadir store de mesas aislado por restaurante
+- [x] **T19 (10 min)** ~~Añadir store de mesas aislado por restaurante~~
   - Archivos: `packages/web-admin/src/app/features/tables/store/table.store.ts`, `table.store.spec.ts` (nuevos).
   - Dependencias: T18.
   - Comprobación: signals de datos/carga/error, mutaciones tras éxito; cambiar A→B limpia A y una respuesta tardía de A no sustituye B ni su error/carga.
+  - Evidencia: Rojo: con `TableStore` esqueleto vacío, `npm run test -w @resttek/web-admin -- --include '**/table.store.spec.ts'` → 9 de 9 fallan por aserciones. Verde: tras implementar (secuencia de carga, `restaurantId` actual, mutaciones aplicadas solo tras éxito y solo si el restaurante sigue siendo el actual, lista ordenada por número, errores de mutación relanzados sin tocar la lista), suite admin completa → 6 archivos, 28 tests pasan. Cubre A→B con datos/error/carga tardíos de A ignorados.
 - [ ] **T20 (10 min)** Crear listado de mesas con estados y borrado confirmado
   - Archivos: `packages/web-admin/src/app/features/tables/pages/table-list/table-list.component.{ts,html,css,spec.ts}` (nuevos).
   - Dependencias: T19.
