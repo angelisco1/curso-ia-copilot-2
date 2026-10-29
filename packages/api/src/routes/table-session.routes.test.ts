@@ -104,3 +104,81 @@ describe('Rutas de ocupacion de mesas (T13)', () => {
         expect([401, 403]).toContain(res.status)
     })
 })
+
+describe('Rutas de ocupacion: permisos y aislamiento (T15)', () => {
+    beforeAll(async () => {
+        await dbConfig.initialize()
+    })
+    afterAll(async () => {
+        await dbConfig.close()
+    })
+    beforeEach(resetDatabase)
+
+    const mk = async (restaurantId: string, number = 1, capacity = 4) =>
+        (await request(app).post(tablesUrl(restaurantId)).set(...bearer(tokens.admin)).send({ number, description: '', capacity })).body
+    const staffTokens = [tokens.admin, tokens.manager1, tokens.camarero1, tokens.cocinero1]
+
+    it('solo el cliente usa disponibilidad, confirmacion y sesion actual: personal → 403 {error} sin efectos', async () => {
+        const table = await mk('r1')
+        for (const t of staffTokens) {
+            const available = await request(app).get(`${tablesUrl()}/available?partySize=2`).set(...bearer(t))
+            expect(available.status).toBe(403)
+            expect(available.body).toEqual({ error: expect.any(String) })
+            expect((await request(app).post(sessionsUrl()).set(...bearer(t)).send({ tableId: table.id, partySize: 2 })).status).toBe(403)
+            expect((await request(app).get(`${sessionsUrl()}/current`).set(...bearer(t))).status).toBe(403)
+        }
+        expect(await dbConfig.all('SELECT id FROM table_sessions')).toEqual([])
+    })
+
+    it('sin JWT las tres rutas responden 401', async () => {
+        expect((await request(app).get(`${tablesUrl()}/available?partySize=2`)).status).toBe(401)
+        expect((await request(app).post(sessionsUrl()).send({ tableId: 'x', partySize: 2 })).status).toBe(401)
+        expect((await request(app).get(`${sessionsUrl()}/current`)).status).toBe(401)
+    })
+
+    it('la disponibilidad no expone identidad: ni clientId, ni estado, ni sesion; mesas de otros restaurantes no aparecen', async () => {
+        const t1 = await mk('r1', 1)
+        const t2 = await mk('r1', 2)
+        await mk('r2', 1)
+        await request(app).post(sessionsUrl()).set(...bearer(tokens.cliente2)).send({ tableId: t1.id, partySize: 2 })
+        const res = await request(app).get(`${tablesUrl()}/available?partySize=2`).set(...bearer(tokens.cliente))
+        expect(res.body).toEqual([{ id: t2.id, number: 2, description: '', capacity: 4 }])
+        const raw = JSON.stringify(res.body)
+        for (const forbidden of ['cli-2', 'clientId', 'status', 'activeSessionId', 'restaurantId']) {
+            expect(raw).not.toContain(forbidden)
+        }
+    })
+
+    it('ids cruzados: confirmar en el path de otro restaurante con la mesa ajena → 404 y no ocupa la mesa', async () => {
+        const t2 = await mk('r2')
+        const res = await request(app).post(sessionsUrl('r1')).set(...bearer(tokens.cliente)).send({ tableId: t2.id, partySize: 2 })
+        expect(res.status).toBe(404)
+        expect((await request(app).get(`${tablesUrl('r2')}/${t2.id}`).set(...bearer(tokens.admin))).body.status).toBe('libre')
+    })
+
+    it('current solo devuelve la sesion del propio cliente y por restaurante; otro cliente recibe null', async () => {
+        const t1 = await mk('r1')
+        const t2 = await mk('r2')
+        const mine = (await request(app).post(sessionsUrl('r1')).set(...bearer(tokens.cliente)).send({ tableId: t1.id, partySize: 2 })).body
+        await request(app).post(sessionsUrl('r2')).set(...bearer(tokens.cliente2)).send({ tableId: t2.id, partySize: 2 })
+        expect((await request(app).get(`${sessionsUrl('r1')}/current`).set(...bearer(tokens.cliente))).body).toEqual(mine)
+        expect((await request(app).get(`${sessionsUrl('r2')}/current`).set(...bearer(tokens.cliente))).text).toBe('null')
+        expect((await request(app).get(`${sessionsUrl('r1')}/current`).set(...bearer(tokens.cliente2))).text).toBe('null')
+    })
+
+    it('un cliente puede mantener sesiones en restaurantes distintos y no libera la otra al ocupar', async () => {
+        const t1 = await mk('r1')
+        const t2 = await mk('r2')
+        expect((await request(app).post(sessionsUrl('r1')).set(...bearer(tokens.cliente)).send({ tableId: t1.id, partySize: 2 })).status).toBe(201)
+        expect((await request(app).post(sessionsUrl('r2')).set(...bearer(tokens.cliente)).send({ tableId: t2.id, partySize: 2 })).status).toBe(201)
+        expect((await request(app).get(`${sessionsUrl('r1')}/current`).set(...bearer(tokens.cliente))).body).not.toBeNull()
+    })
+
+    it('un cliente sin permiso no puede liberar su propia mesa (solo personal): PATCH status → 403 y la sesion sigue abierta', async () => {
+        const t1 = await mk('r1')
+        await request(app).post(sessionsUrl()).set(...bearer(tokens.cliente)).send({ tableId: t1.id, partySize: 2 })
+        const res = await request(app).patch(`${tablesUrl()}/${t1.id}/status`).set(...bearer(tokens.cliente)).send({ status: 'libre' })
+        expect(res.status).toBe(403)
+        expect((await request(app).get(`${sessionsUrl()}/current`).set(...bearer(tokens.cliente))).body).not.toBeNull()
+    })
+})
