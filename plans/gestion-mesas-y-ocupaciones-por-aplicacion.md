@@ -304,14 +304,16 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T41.
   - Comprobación: volver/recargar con sesión abierta recupera la misma; liberada o borrada no permite añadir/enviar usando contexto obsoleto; logout/otro usuario no hereda contexto local. Mis pedidos y detalle siguen mostrando pedidos previos.
   - Evidencia: rojo: specs no compilaban (`TableSessionStore.revalidate` inexistente). Verde: 108 tests. `revalidate()` devuelve `valid`/`closed`/`unknown` (null u otra sesión = closed; error de red = unknown, el servidor valida al enviar). Carrito (al abrirse y al volver a la pestaña) y carta (al volver a la pestaña) reconsultan al servidor; con `closed` hacen `clear`+`reset` y vuelven a selección con aviso; `addToCart` sin ocupación vigente no añade. `CartStore` se vacía al hacer logout o cambiar de usuario (effect sobre `AuthStore.user().id`, sin reset en la primera ejecución). Mis pedidos y detalle muestran `Mesa N` y `Ocupación anterior` (si `tableSessionEndedAt`), y siguen mostrando pedidos históricos sin esos campos o con null. No verificado en navegador: el comportamiento real de `visibilitychange` solo está cubierto con eventos simulados en jsdom.
-- [ ] **T43 (10 min)** Cubrir recorrido de selección, doble clic y visita nueva
+- [x] **T43 (10 min)** ~~Cubrir recorrido de selección, doble clic y visita nueva~~
   - Archivos: specs de selección, guard, sesión y carrito.
   - Dependencias: T42.
   - Comprobación: escenarios de capacidad exacta/sobrante, 0/decimal, ausencia de mesas, dos clientes compitiendo, doble clic y segunda visita sin carrito de la primera.
+  - Evidencia: tarea de cobertura: no hay rojo porque T36–T42 ya implementaban el comportamiento; se añadieron tests que pasan desde el inicio (112 tests en total). Nuevo `features/tables/table-visit-flow.spec.ts`: capacidad exacta, capacidad sobrante, ausencia de mesas (sin continuar) y segunda visita sin carrito de la primera. Ya cubiertos en specs previos: grupo `''`/`0`/`-1`/`2.5`/`abc`/`1e2` (page), dos clientes compitiendo = 409 mesa no disponible o sesión activa (T38), doble clic = una llamada.
 - [ ] **T44 (5 min)** Validar clientes con el backend integrado
   - Archivos: este plan.
   - Dependencias: T17, T43.
   - Comprobación: `npm run test -w @resttek/web-clientes` (disponible tras T34), `npm run build -w @resttek/web-clientes`; navegador con recarga y retorno desde otro restaurante confirma recuperación sin liberación automática.
+  - Evidencia parcial (T44 NO completada): `npm run test -w @resttek/web-clientes` 112/112 en 15 ficheros y `npm run build -w @resttek/web-clientes` correcto. PENDIENTE: validación con backend integrado y navegador (recarga y retorno desde otro restaurante), no realizada porque depende de T17 y de la implementación de los contratos en la API, que aún no están en esta rama. Tampoco se ha verificado manualmente `visibilitychange` real ni el formato final de los errores 400/403/404/409 de sesión.
 
 ### E. Integración y documentación — agente coordinador
 
