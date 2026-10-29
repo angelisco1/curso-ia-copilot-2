@@ -7,9 +7,10 @@ info:
     visita actual. Pertenece a la tarea 21 (plan
     plans/gestion-mesas-y-ocupaciones-por-aplicacion.md, tareas T01 y T02).
 
-    **Estado: PROPUESTO Y PENDIENTE DE IMPLEMENTAR.** Ninguna operacion de este
-    documento existe todavia en la API; describe el comportamiento objetivo y
-    no debe presentarse como desplegado hasta verificarlo con pruebas HTTP.
+    **Estado: IMPLEMENTADO Y VERIFICADO LOCALMENTE (no desplegado).** Las
+    operaciones de este documento estan implementadas en la API y cubiertas por
+    pruebas HTTP locales (Supertest con SQLite en memoria); no se ha comprobado
+    ningun despliegue.
     Los consumidores (admin, empleados, clientes) deben revisarlo antes de
     empezar la implementacion frontend. Los pedidos se documentan en
     [orders.openapi.yaml](orders.openapi.yaml).
@@ -67,7 +68,7 @@ paths:
     post:
       tags: [Mesas]
       operationId: crearMesa
-      summary: Crear una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Crear una mesa (implementado y verificado localmente)
       description: |
         Solo admin. `restaurantId` sale de la ruta y debe existir. `status`
         es opcional y por defecto `libre`; si se crea `ocupada` se abre una
@@ -108,7 +109,7 @@ paths:
     get:
       tags: [Mesas]
       operationId: listarMesas
-      summary: Listar las mesas no eliminadas de un restaurante (PENDIENTE DE IMPLEMENTAR)
+      summary: Listar las mesas no eliminadas de un restaurante (implementado y verificado localmente)
       description: |
         Roles: admin, manager y camarero (manager y camarero solo de su
         restaurante). Devuelve las mesas en cualquiera de los tres estados,
@@ -144,7 +145,7 @@ paths:
     get:
       tags: [Ocupaciones]
       operationId: listarMesasDisponibles
-      summary: Consultar mesas libres con capacidad suficiente (PENDIENTE DE IMPLEMENTAR)
+      summary: Consultar mesas libres con capacidad suficiente (implementado y verificado localmente)
       description: |
         Solo cliente. Devuelve las mesas `libre` no eliminadas con
         `capacity >= partySize`, ordenadas por `capacity` y despues `number`
@@ -193,7 +194,7 @@ paths:
     get:
       tags: [Mesas]
       operationId: obtenerMesa
-      summary: Obtener una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Obtener una mesa (implementado y verificado localmente)
       description: |
         Roles: admin, manager y camarero (manager y camarero solo de su
         restaurante). Una mesa borrada o de otro restaurante distinto al de la
@@ -219,7 +220,7 @@ paths:
     put:
       tags: [Mesas]
       operationId: actualizarMesa
-      summary: Sustituir los datos de una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Sustituir los datos de una mesa (implementado y verificado localmente)
       description: |
         Solo admin. No es un parche: requiere `number`, `description`,
         `capacity` y `status`. `id` y `restaurantId` son inmutables y se
@@ -259,7 +260,7 @@ paths:
     delete:
       tags: [Mesas]
       operationId: borrarMesa
-      summary: Borrar logicamente una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Borrar logicamente una mesa (implementado y verificado localmente)
       description: |
         Solo admin. Marca `deletedAt`, cierra la sesion abierta (incluso con
         la mesa ocupada y pedidos pendientes) y conserva sesiones, pedidos e
@@ -284,7 +285,7 @@ paths:
     patch:
       tags: [Mesas]
       operationId: cambiarEstadoMesa
-      summary: Cambiar el estado de una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Cambiar el estado de una mesa (implementado y verificado localmente)
       description: |
         Roles: admin, manager y camarero (manager y camarero solo de su
         restaurante). Aplica las transiciones descritas en la cabecera:
@@ -332,7 +333,7 @@ paths:
     get:
       tags: [Pedidos de mesa]
       operationId: listarPedidosDeMesaActual
-      summary: Pedidos de la sesion abierta de una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Pedidos de la sesion abierta de una mesa (implementado y verificado localmente)
       description: |
         Roles: admin, manager y camarero (manager y camarero solo de su
         restaurante). Devuelve unicamente los pedidos de la sesion abierta, con
@@ -368,7 +369,7 @@ paths:
     post:
       tags: [Ocupaciones]
       operationId: confirmarOcupacion
-      summary: Confirmar la ocupacion de una mesa (PENDIENTE DE IMPLEMENTAR)
+      summary: Confirmar la ocupacion de una mesa (implementado y verificado localmente)
       description: |
         Solo cliente; `clientId` sale del JWT y nunca del cuerpo. Revalida en
         servidor restaurante, mesa no borrada, estado `libre` y
@@ -426,7 +427,7 @@ paths:
     get:
       tags: [Ocupaciones]
       operationId: recuperarOcupacionActual
-      summary: Recuperar la ocupacion propia en un restaurante (PENDIENTE DE IMPLEMENTAR)
+      summary: Recuperar la ocupacion propia en un restaurante (implementado y verificado localmente)
       description: |
         Solo cliente. Devuelve la sesion abierta del cliente del JWT en ese
         restaurante junto a su mesa, o el literal JSON `null` con 200 si no

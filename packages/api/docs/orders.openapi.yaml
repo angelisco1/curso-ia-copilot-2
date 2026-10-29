@@ -9,10 +9,11 @@ info:
     [tables.openapi.yaml](tables.openapi.yaml).
 
     **Estado.** Lo marcado como *existente* describe el comportamiento actual
-    de la API tal como esta implementado. Lo marcado como **PENDIENTE DE
-    IMPLEMENTAR** (campos `tableSessionId`, `tableNumber`,
+    de la API tal como esta implementado. Lo marcado como **IMPLEMENTADO Y
+    VERIFICADO LOCALMENTE** (campos `tableSessionId`, `tableNumber`,
     `tableSessionEndedAt`, validacion de sesion del cliente y los errores
-    nuevos) es una propuesta no desplegada hasta verificarla con pruebas HTTP.
+    nuevos) esta cubierto por pruebas HTTP locales (Supertest con SQLite en
+    memoria); no se ha comprobado ningun despliegue.
 
     Comportamiento existente que se conserva: todas las rutas requieren JWT y
     solo se comprueba autenticacion (no el rol); `restaurantId` y `tableId` se
@@ -50,7 +51,7 @@ paths:
         responde 201 con el pedido. No se valida el rol ni que los platos
         existan en este nivel.
 
-        **PENDIENTE DE IMPLEMENTAR (T12/T14):** si el actor es `cliente`,
+        **IMPLEMENTADO Y VERIFICADO LOCALMENTE (T12/T14):** si el actor es `cliente`,
         `tableSessionId` es obligatorio y debe ser una sesion abierta del
         propio cliente; `restaurantId` y, si se envia, `tableId` deben
         coincidir con los de esa sesion (el servidor fija `tableId`, y
@@ -68,7 +69,7 @@ paths:
               $ref: '#/components/schemas/CrearPedido'
             examples:
               clienteConSesion:
-                summary: PENDIENTE - cliente con su sesion activa
+                summary: Implementado - cliente con su sesion activa
                 value:
                   restaurantId: rest-1
                   tableId: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
@@ -95,7 +96,7 @@ paths:
                 $ref: '#/components/schemas/Order'
               examples:
                 conSesion:
-                  summary: PENDIENTE - pedido de cliente con mesa
+                  summary: Implementado - pedido de cliente con mesa
                   value:
                     id: 0f6c2e5a-3b4d-4e6f-8a7b-dddddddddddd
                     restaurantId: rest-1
@@ -126,10 +127,12 @@ paths:
           description: |
             Existente: cualquier `Error` del servicio se devuelve con 400 y
             `{error: <mensaje>}`, p. ej. `RestaurantIdRequiredError` (mensaje
-            `Restaurant ID is required`). PENDIENTE: la falta de
+            `Restaurant ID is required`). Implementado: la falta de
             `tableSessionId` o discordancia de restaurante/mesa en un cliente
             se responde 400 con el formato `{error, message}` de los errores de
-            dominio nuevos (a confirmar, ver preguntas de revision).
+            dominio nuevos: `TableSessionRequiredError` o
+            `TableSessionMismatchError` (mensaje `The order does not match the
+            restaurant or table of the session`).
           content:
             application/json:
               schema:
@@ -140,20 +143,23 @@ paths:
                 restauranteAusente:
                   value: {error: Restaurant ID is required}
                 sesionRequerida:
-                  summary: PENDIENTE
+                  summary: Implementado
                   value: {error: TableSessionRequiredError, message: A table session is required to place an order}
+                discordancia:
+                  summary: Implementado
+                  value: {error: TableSessionMismatchError, message: The order does not match the restaurant or table of the session}
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
           description: |
-            PENDIENTE: sesion de otro cliente (titularidad ajena).
+            Implementado: sesion de otro cliente (titularidad ajena).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorAplicacion'
               example: {error: TableSessionForbiddenError, message: The table session does not belong to the client}
         '404':
-          description: PENDIENTE - `tableSessionId` inexistente.
+          description: Implementado - `tableSessionId` inexistente.
           content:
             application/json:
               schema:
@@ -161,7 +167,7 @@ paths:
               example: {error: TableSessionNotFoundError, message: Table session not found}
         '409':
           description: |
-            PENDIENTE - la sesion esta cerrada (liberada por un empleado o
+            Implementado - la sesion esta cerrada (liberada por un empleado o
             mesa borrada), tambien si se cierra en una carrera concurrente.
             No se crea el pedido.
           content:
@@ -179,8 +185,8 @@ paths:
       description: |
         Existente. Pedidos con al menos un item no `entregado`, ordenados por
         `createdAt` ascendente. Incluye pedidos historicos sin sesion y de
-        sesiones ya cerradas (con `tableSessionEndedAt` informado PENDIENTE de
-        implementar). No incluye `restaurantName` ni `restaurantLogoUrl`.
+        sesiones ya cerradas (con `tableSessionEndedAt` informado; implementado y
+        verificado localmente). No incluye `restaurantName` ni `restaurantLogoUrl`.
         Para ver todos los pedidos, incluso entregados, de la visita actual de
         una mesa usar `GET /restaurants/{restaurantId}/tables/{tableId}/orders`
         en [tables.openapi.yaml](tables.openapi.yaml).
@@ -343,14 +349,14 @@ components:
           type: string
           nullable: true
           description: |
-            Existente: texto libre opcional. PENDIENTE: en clientes debe
+            Existente: texto libre opcional. Implementado: en clientes debe
             coincidir con la mesa de la sesion; el servidor la fija desde ella.
         tableSessionId:
           type: string
           format: uuid
           nullable: true
           description: |
-            PENDIENTE. Obligatorio para el rol `cliente`; opcional para los
+            Implementado. Obligatorio para el rol `cliente`; opcional para los
             demas actores y para llamadas existentes.
         items:
           type: array
@@ -435,19 +441,19 @@ components:
           format: uuid
           nullable: true
           description: |
-            PENDIENTE. Null en pedidos historicos o sin sesion. Cuando existen
+            Implementado. Null en pedidos historicos o sin sesion. Cuando existen
             los campos nuevos, se devuelven siempre (con null si no aplican).
         tableNumber:
           type: integer
           minimum: 1
           nullable: true
-          description: PENDIENTE. Numero de mesa de presentacion; null si no hay mesa conocida.
+          description: Implementado. Numero de mesa de presentacion; null si no hay mesa conocida.
         tableSessionEndedAt:
           type: string
           format: date-time
           nullable: true
           description: |
-            PENDIENTE. Fecha de cierre de la sesion; no null indica
+            Implementado. Fecha de cierre de la sesion; no null indica
             ocupacion anterior. Null si la sesion sigue abierta o no hay sesion.
     ErrorHeredado:
       type: object
@@ -459,7 +465,7 @@ components:
     ErrorAplicacion:
       type: object
       required: [error, message]
-      description: Formato de errores de dominio nuevos (PENDIENTE).
+      description: Formato de errores de dominio nuevos (implementado).
       properties:
         error:
           type: string
