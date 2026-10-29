@@ -269,10 +269,11 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T01, T34.
   - Comprobación: GET con grupo, POST solo al continuar, GET current con sesión o null, errores 409 propagados; nunca enviar clientId.
   - Evidencia: contrato `tables.openapi.yaml` (propuesto, aún no implementado en la API; solo lectura, no incluido en commits frontend). Rojo: `table.service.spec.ts` no compilaba al no existir `TableService`. Verde: `npm run test -w @resttek/web-clientes` 9 tests; cubre GET con `partySize`, POST solo `{tableId, partySize}` (sin `clientId`), 201 y 200 idempotente, `current` con sesión, literal `null`/cuerpo sin sesión → `null`, 409 propagado con su cuerpo.
-- [ ] **T36 (10 min)** Mantener y recuperar contexto de ocupación desde servidor
+- [x] **T36 (10 min)** ~~Mantener y recuperar contexto de ocupación desde servidor~~
   - Archivos: `packages/web-clientes/src/app/core/store/table-session.store.ts`, `table-session.store.spec.ts` (nuevos).
   - Dependencias: T35.
   - Comprobación: signals de sesión/mesa/carga/error, recuperación por restaurante, no mezclar respuestas A/B; recarga reconstruye desde API sin confiar en datos locales. Salir/cambiar restaurante no llama a liberar.
+  - Evidencia: rojo: specs no compilaban (`api-error` y `table-session.store` inexistentes). Verde: 30 tests. `TableSessionStore` (solo memoria, sin persistencia) expone `occupation/session/table/sessionId/partySize/loading/error`, `load()` descarta respuestas y errores de peticiones superadas (A/B), cambiar de restaurante descarta la ocupación anterior, la ocupación se oculta si cambia el usuario y no existe operación de liberación. Se añade `core/models/api-error.ts` (+spec) para tratar ambos formatos de error (`{error,message}` y `{error}` heredado) y los códigos de sesión/mesa explícitamente. Incertidumbre documentada: el contrato marca como "a confirmar" el formato exacto del 400 por sesión ausente; el parser admite ambos formatos y reconoce los mensajes literales conocidos.
 - [ ] **T37 (10 min)** Crear paso de número de personas y listado elegible
   - Archivos: `packages/web-clientes/src/app/features/tables/table-selection.component.{ts,html,css,spec.ts}` (nuevos).
   - Dependencias: T35, T36.
