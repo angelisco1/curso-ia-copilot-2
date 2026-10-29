@@ -252,3 +252,33 @@ export class InvalidActorError extends AppError {
         super('Authenticated user is missing required claims')
     }
 }
+
+export class TableSessionRequiredError extends AppError {
+    constructor() {
+        super('A table session is required to place an order')
+    }
+}
+
+export class TableSessionNotFoundError extends AppError {
+    constructor() {
+        super('Table session not found')
+    }
+}
+
+export class TableSessionForbiddenError extends AppError {
+    constructor() {
+        super('The table session does not belong to the client')
+    }
+}
+
+export class TableSessionClosedError extends AppError {
+    constructor() {
+        super('The table session is closed')
+    }
+}
+
+export class TableSessionMismatchError extends AppError {
+    constructor() {
+        super('The order does not match the restaurant or table of the session')
+    }
+}
