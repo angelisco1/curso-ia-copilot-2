@@ -87,6 +87,7 @@ describe('employee routes', () => {
   let router: Router
   let role: string | null
   let authenticated: boolean
+  let clearSession: ReturnType<typeof vi.fn>
   let orderStore: {
     orders: ReturnType<typeof signal>
     loading: ReturnType<typeof signal>
@@ -99,6 +100,7 @@ describe('employee routes', () => {
   beforeEach(() => {
     role = 'manager'
     authenticated = true
+    clearSession = vi.fn()
     orderStore = {
       orders: signal([]),
       loading: signal(false),
@@ -125,7 +127,8 @@ describe('employee routes', () => {
               restaurantId: 'restaurant-1',
               firstName: 'Test',
               lastName: 'Employee'
-            })
+            }),
+            clearSession
           }
         },
         { provide: AuthService, useValue: { logout: vi.fn() } },
@@ -185,6 +188,7 @@ describe('employee routes', () => {
       expect(router.url).toBe('/login')
       expect(activeComponent()).toBe(LoginComponent)
       expect(orderStore.startPolling).not.toHaveBeenCalled()
+      expect(clearSession).not.toHaveBeenCalled()
     }
   )
 
@@ -199,6 +203,7 @@ describe('employee routes', () => {
       expect(router.url).toBe('/login')
       expect(activeComponent()).toBe(LoginComponent)
       expect(orderStore.startPolling).not.toHaveBeenCalled()
+      expect(clearSession).not.toHaveBeenCalled()
     }
   )
 

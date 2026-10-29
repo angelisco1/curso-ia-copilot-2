@@ -82,11 +82,13 @@ El usuario ha confirmado que un camarero o cocinero que solicite una vista no pe
   - Comprobación: `npm run test -w @resttek/web-empleados -- --include=src/app/app.routes.spec.ts` reproduce en rojo el acceso de camarero a cocina, el de cocinero a barra/salón y la entrada inicial incorrecta del camarero; los accesos ya permitidos siguen funcionando.
   - Evidencia TDD: rojo — el comando focalizado terminó con código 1 por 17 aserciones fallidas y 24 pruebas pasadas (sin fallos de compilación o infraestructura). Reproduce las tres rutas restringidas, redirecciones iniciales incorrectas para camarero/manager/admin, los nueve accesos de roles no admitidos y dos navegaciones entre rutas hermanas; las rutas permitidas y sesiones sin token pasan.
 
-- [ ] **T05 (10 min)** Proteger todas las rutas hijas y corregir la entrada inicial
+- [x] **T05 (10 min)** ~~Proteger todas las rutas hijas y corregir la entrada inicial~~
   - Acción: añadir un guard funcional local de rutas hijas que consulte la política, compruebe sesión y devuelva `UrlTree` al denegar, sin navegación imperativa. Conectarlo con `canActivateChild` para cubrir también cambios entre vistas con el shell activo. Sustituir el redirect fijo del hijo vacío por una redirección dependiente de la misma política, utilizando las capacidades del router instalado. Conservar `authGuard` del padre, las rutas de login y not-found y el lazy loading.
   - Archivos o componentes: nuevo `packages/web-empleados/src/app/core/auth/employee-role.guard.ts`, `packages/web-empleados/src/app/app.routes.ts` y specs de T04.
   - Dependencias: T04.
   - Comprobación: las pruebas de T04 pasan; las denegaciones terminan en la ruta acordada, no activan la página prohibida y no crean bucles. Cliente/rol ausente/desconocido terminan en `/login` sin borrar sesión; sin token termina en `/login` incluso con rol aparentemente válido.
+  - Evidencia TDD: rojo — las pruebas de navegación agregadas en T04 fallaron en 17 aserciones de rutas y destinos (registrado en el commit `fd852c9`). Verde/refactor — `npm run test -w @resttek/web-empleados -- --include=src/app/app.routes.spec.ts` pasó (41 pruebas), con aserciones de que la navegación denegada no llama a `clearSession`; `npm run test -w @resttek/web-empleados` pasó (71 pruebas) y `npm run build -w @resttek/web-empleados` terminó correctamente. El guard devuelve `UrlTree` a `/login` sin sesión o con rol no admitido y a la vista inicial para camarero/cocinero; las rutas permitidas siguen lazy-loaded y no activan componentes prohibidos.
+  - Nota de seguimiento: el commit `fd852c9` incluyó conjuntamente las pruebas de T04 y la primera implementación de rutas de T05. Se conserva el historial sin reescritura; este cierre registra la verificación completa y el ajuste final del guard.
 
 - [ ] **T06 (10 min)** Unificar el menú con la política y conservar el aviso de restaurante
   - Acción: escribir primero pruebas del shell para enlaces visibles por rol y falta de restaurante; después sustituir sus comparaciones duplicadas por la política local. Incluir admin en las tres vistas y eliminar o conectar el cálculo de ruta inicial sin dejar una segunda política divergente. No modificar páginas de pedidos ni el logout.
@@ -131,9 +133,9 @@ Estimación total: **65 minutos**, sin contar bloqueos externos.
 - [ ] **CA07** Se conserva la experiencia existente salvo los cambios expresamente acordados.
   - Verificación: specs del shell confirman enlaces por rol, aviso sin restaurante y logout; las pruebas de router comprueban `/login` y not-found para una URL inexistente. No se modifican web-shared ni otras aplicaciones.
   - Evidencia: pendiente.
-- [ ] **CA08** La corrección tiene validación automatizada ejecutable y compilación correcta.
+- [x] **CA08** La corrección tiene validación automatizada ejecutable y compilación correcta.
   - Verificación: `npm run test -w @resttek/web-empleados` y `npm run build -w @resttek/web-empleados`, ambos con salida exitosa. Registrar resultados y advertencias; no usar `npm test` de la raíz como sustituto.
-  - Evidencia: pendiente.
+  - Evidencia: suite del paquete exitosa (2 archivos, 71 pruebas) y build de producción exitoso, ambos en el worktree de la tarea.
 - [ ] **CA09** La documentación representa el acceso real de las rutas.
   - Verificación: revisión de glosario y arquitectura contra la matriz y tests; se documenta la excepción admin confirmada por el usuario y se conserva la distinción entre guard frontend y autorización de la API.
   - Evidencia: pendiente.
