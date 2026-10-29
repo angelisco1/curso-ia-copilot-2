@@ -195,10 +195,12 @@ Propiedad: `packages/web-admin/**`. No modificar API, otros frontends ni documen
   - Dependencias: T18.
   - Comprobación: signals de datos/carga/error, mutaciones tras éxito; cambiar A→B limpia A y una respuesta tardía de A no sustituye B ni su error/carga.
   - Evidencia: Rojo: con `TableStore` esqueleto vacío, `npm run test -w @resttek/web-admin -- --include '**/table.store.spec.ts'` → 9 de 9 fallan por aserciones. Verde: tras implementar (secuencia de carga, `restaurantId` actual, mutaciones aplicadas solo tras éxito y solo si el restaurante sigue siendo el actual, lista ordenada por número, errores de mutación relanzados sin tocar la lista), suite admin completa → 6 archivos, 28 tests pasan. Cubre A→B con datos/error/carga tardíos de A ignorados.
-- [ ] **T20 (10 min)** Crear listado de mesas con estados y borrado confirmado
-  - Archivos: `packages/web-admin/src/app/features/tables/pages/table-list/table-list.component.{ts,html,css,spec.ts}` (nuevos).
+- [x] **T20 (10 min)** ~~Crear listado de mesas con estados y borrado confirmado~~
+  - Archivos: `packages/web-admin/src/app/features/tables/pages/table-list/table-list.page.{ts,html,css,spec.ts}` (nuevos; clase `TableListPage`).
   - Dependencias: T19.
   - Comprobación: columnas de los cinco campos, acciones de alta/edición/borrado, estados vacío/cargando/error y aviso de cierre de ocupación/conservación de pedidos antes de borrar.
+  - Ajuste de nomenclatura: el plan original decía `table-list.component.*`; por ser una pantalla asociada a una ruta se usa la convención de pages (`*.page.*`, clase `*Page`) de las instrucciones del agente frontend. Lo mismo aplica a `table-form` (T21/T22). No se renombran pantallas existentes.
+  - Evidencia: Rojo: con `TableListPage` vacía, `--include '**/table-list.page.spec.ts'` → 9 de 9 fallan por aserciones (no carga, sin columnas/enlaces/estados, sin botón de borrar). Verde: tras implementar página, plantilla y estilos, suite admin completa → 7 archivos, 37 tests pasan. Verificado con DOM real y rutas (`RouterTestingHarness`): carga del restaurante de la ruta, columnas Número/Descripción/Capacidad/Estado, filas con Libre/Ocupada/Reservada, enlaces `/restaurants/rest-1/tables/new` y `.../t1/edit`, botón borrar, spinner, error, vacío, `confirm` con aviso de cierre de ocupación y conservación de pedidos, cancelar no llama a la API, confirmar llama `delete('rest-1','t1')`, fallo mantiene la fila y muestra error.
 - [ ] **T21 (10 min)** Crear formulario de alta con validación de campos
   - Archivos: `packages/web-admin/src/app/features/tables/pages/table-form/table-form.component.{ts,html,css,spec.ts}` (nuevos).
   - Dependencias: T19.
