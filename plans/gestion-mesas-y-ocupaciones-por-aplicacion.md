@@ -225,6 +225,7 @@ Propiedad: `packages/web-admin/**`. No modificar API, otros frontends ni documen
   - Archivos: este plan.
   - Dependencias: T17, T24.
   - Comprobación: `npm run test -w @resttek/web-admin` y `npm run build -w @resttek/web-admin`; prueba manual CRUD con API real, incluidos número duplicado y capacidad insuficiente durante ocupación.
+  - Evidencia parcial: `npm run test -w @resttek/web-admin` → 13 archivos, 87 tests pasan; `npm run build -w @resttek/web-admin` → exit 0 (bundle generado, chunk lazy `table-list-page`). PENDIENTE (tarea no marcada): prueba manual CRUD contra API real (alta, edición, borrado, número duplicado y capacidad insuficiente con mesa ocupada); depende de T17 (API), no disponible en este worktree. No se ha ejecutado ni se declara resultado.
 
 ### C. Empleados — agente Frontend Angular, alcance web-empleados
 
