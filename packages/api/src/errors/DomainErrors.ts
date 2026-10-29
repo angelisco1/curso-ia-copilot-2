@@ -234,3 +234,21 @@ export class TableCapacityConflictError extends AppError {
         super('Capacity cannot be lower than the active party size')
     }
 }
+
+export class ForbiddenRestaurantError extends AppError {
+    constructor() {
+        super('Actor cannot operate on this restaurant')
+    }
+}
+
+export class ForbiddenRoleError extends AppError {
+    constructor() {
+        super('Actor role cannot perform this operation')
+    }
+}
+
+export class InvalidActorError extends AppError {
+    constructor() {
+        super('Authenticated user is missing required claims')
+    }
+}
