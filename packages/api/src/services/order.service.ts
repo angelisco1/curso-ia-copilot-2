@@ -42,7 +42,10 @@ export class OrderService {
             tableId: request.tableId,
             clientId: request.clientId,
             createdAt: new Date(),
-            items
+            items,
+            tableSessionId: null,
+            tableNumber: null,
+            tableSessionEndedAt: null
         }
 
         await this.orderRepository.create(order)

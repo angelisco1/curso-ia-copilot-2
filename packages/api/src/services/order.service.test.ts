@@ -19,6 +19,9 @@ describe('OrderService.updateItemStatus', () => {
             tableId: null,
             clientId: null,
             createdAt: new Date(),
+            tableSessionId: null,
+            tableNumber: null,
+            tableSessionEndedAt: null,
             items: [
                 { id: 'item-1', dishId: 'dish-1', quantity: 1, notes: null, status: 'pendiente' }
             ]

@@ -8,6 +8,9 @@ interface OrderRow {
     table_id: string | null
     client_id: string | null
     created_at: string
+    table_session_id: string | null
+    table_number: number | null
+    table_session_ended_at: string | null
 }
 
 interface OrderRowWithRestaurant extends OrderRow {
@@ -30,12 +33,25 @@ interface OrderItemWithDishRow extends OrderItemRow {
     dish_category: string
 }
 
+const SELECT_ORDER = `SELECT o.*, rt.number AS table_number, ts.ended_at AS table_session_ended_at`
+const JOIN_SESSION = `LEFT JOIN table_sessions ts ON ts.id = o.table_session_id
+             LEFT JOIN restaurant_tables rt ON rt.id = ts.table_id`
+
+function sessionFields(row: OrderRow) {
+    return {
+        tableSessionId: row.table_session_id,
+        tableNumber: row.table_number,
+        tableSessionEndedAt: row.table_session_ended_at
+    }
+}
+
 export interface OrderRepository {
     create(order: Order): Promise<void>
     findById(id: string): Promise<Order | null>
     updateItemStatus(orderId: string, itemId: string, status: string): Promise<void>
     findActiveByRestaurant(restaurantId: string): Promise<Order[]>
     findByClientId(clientId: string): Promise<Order[]>
+    findBySession(sessionId: string): Promise<Order[]>
 }
 
 export class SqliteOrderRepository implements OrderRepository {
@@ -43,8 +59,8 @@ export class SqliteOrderRepository implements OrderRepository {
 
     async create(order: Order): Promise<void> {
         await this.db.run(
-            'INSERT INTO orders (id, restaurant_id, table_id, client_id, created_at) VALUES (?, ?, ?, ?, ?)',
-            [order.id, order.restaurantId, order.tableId, order.clientId, order.createdAt.toISOString()]
+            'INSERT INTO orders (id, restaurant_id, table_id, client_id, created_at, table_session_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [order.id, order.restaurantId, order.tableId, order.clientId, order.createdAt.toISOString(), order.tableSessionId]
         )
 
         for (const item of order.items) {
@@ -57,8 +73,9 @@ export class SqliteOrderRepository implements OrderRepository {
 
     async findById(id: string): Promise<Order | null> {
         const orderRow = await this.db.get<OrderRowWithRestaurant>(
-            `SELECT o.*, r.name as restaurant_name, r.logo_url as restaurant_logo_url
+            `${SELECT_ORDER}, r.name as restaurant_name, r.logo_url as restaurant_logo_url
              FROM orders o
+             ${JOIN_SESSION}
              LEFT JOIN restaurants r ON o.restaurant_id = r.id
              WHERE o.id = ?`,
             [id]
@@ -74,6 +91,7 @@ export class SqliteOrderRepository implements OrderRepository {
             clientId: orderRow.client_id,
             createdAt: new Date(orderRow.created_at),
             items,
+            ...sessionFields(orderRow),
             restaurantName: orderRow.restaurant_name,
             restaurantLogoUrl: orderRow.restaurant_logo_url
         }
@@ -88,10 +106,10 @@ export class SqliteOrderRepository implements OrderRepository {
 
     async findActiveByRestaurant(restaurantId: string): Promise<Order[]> {
         const query = `
-            SELECT DISTINCT o.*
+            ${SELECT_ORDER}
             FROM orders o
-            JOIN order_items oi ON o.id = oi.order_id
-            WHERE o.restaurant_id = ? AND oi.status != 'entregado'
+            ${JOIN_SESSION}
+            WHERE o.restaurant_id = ? AND EXISTS (SELECT 1 FROM order_items x WHERE x.order_id = o.id AND x.status != 'entregado')
             ORDER BY o.created_at ASC
         `
         const orderRows = await this.db.all<OrderRow>(query, [restaurantId])
@@ -105,7 +123,8 @@ export class SqliteOrderRepository implements OrderRepository {
                 tableId: row.table_id,
                 clientId: row.client_id,
                 createdAt: new Date(row.created_at),
-                items
+                items,
+                ...sessionFields(row)
             })
         }
 
@@ -114,8 +133,9 @@ export class SqliteOrderRepository implements OrderRepository {
 
     async findByClientId(clientId: string): Promise<Order[]> {
         const orderRows = await this.db.all<OrderRowWithRestaurant>(
-            `SELECT o.*, r.name as restaurant_name, r.logo_url as restaurant_logo_url
+            `${SELECT_ORDER}, r.name as restaurant_name, r.logo_url as restaurant_logo_url
              FROM orders o
+             ${JOIN_SESSION}
              LEFT JOIN restaurants r ON o.restaurant_id = r.id
              WHERE o.client_id = ?
              ORDER BY o.created_at DESC`,
@@ -132,11 +152,36 @@ export class SqliteOrderRepository implements OrderRepository {
                 clientId: row.client_id,
                 createdAt: new Date(row.created_at),
                 items,
+                ...sessionFields(row),
                 restaurantName: row.restaurant_name,
                 restaurantLogoUrl: row.restaurant_logo_url
             })
         }
 
+        return orders
+    }
+
+    async findBySession(sessionId: string): Promise<Order[]> {
+        const rows = await this.db.all<OrderRow>(
+            `${SELECT_ORDER}
+             FROM orders o
+             ${JOIN_SESSION}
+             WHERE o.table_session_id = ?
+             ORDER BY o.created_at ASC, o.id ASC`,
+            [sessionId]
+        )
+        const orders: Order[] = []
+        for (const row of rows) {
+            orders.push({
+                id: row.id,
+                restaurantId: row.restaurant_id,
+                tableId: row.table_id,
+                clientId: row.client_id,
+                createdAt: new Date(row.created_at),
+                items: await this.getOrderItems(row.id),
+                ...sessionFields(row)
+            })
+        }
         return orders
     }
 

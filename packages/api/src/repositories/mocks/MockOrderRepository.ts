@@ -25,4 +25,8 @@ export class MockOrderRepository implements OrderRepository {
     async findByClientId(clientId: string): Promise<Order[]> {
         return this.orders.filter(o => o.clientId === clientId)
     }
+
+    async findBySession(sessionId: string): Promise<Order[]> {
+        return this.orders.filter(o => o.tableSessionId === sessionId)
+    }
 }
