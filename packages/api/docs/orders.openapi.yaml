@@ -32,6 +32,26 @@ info:
     `tableSessionId` y expone `tableSessionEndedAt` para etiquetarlo como
     ocupacion anterior; sigue activo en cocina, barra y entregas hasta que se
     entreguen sus items.
+
+    **Errores de sesion en `POST /orders` (rol `cliente`).** Cuerpo siempre
+    `{error: <NombreDeClase>, message: <texto>}`, sin pedido creado. Se
+    evaluan en este orden:
+
+    | Situacion | HTTP | `error` | `message` |
+    | --- | --- | --- | --- |
+    | Sin `tableSessionId` | 400 | `TableSessionRequiredError` | A table session is required to place an order |
+    | `tableSessionId` inexistente | 404 | `TableSessionNotFoundError` | Table session not found |
+    | Sesion de otro cliente | 403 | `TableSessionForbiddenError` | The table session does not belong to the client |
+    | `restaurantId` o `tableId` del cuerpo no coinciden con la sesion | 400 | `TableSessionMismatchError` | The order does not match the restaurant or table of the session |
+    | Sesion cerrada (liberada, mesa borrada o cierre concurrente) | 409 | `TableSessionClosedError` | The table session is closed |
+
+    `TableSessionMismatchError` es el unico 400 de sesion con significado
+    propio: el cliente debe tratarlo como contexto obsoleto o manipulado
+    (volver a `GET .../table-sessions/current`), no como error de campo. Un
+    `restaurantId` ausente sigue siendo el error heredado 400
+    `{error: 'Restaurant ID is required'}` (sin `message`). Sin JWT: 401
+    `{error: 'Unauthorized: No token provided'}`. Los actores que no son
+    cliente conservan la llamada antigua (sesion opcional).
 servers:
   - url: http://localhost:3000
     description: API local; los paths incluyen el prefijo /api/v1.
