@@ -27,13 +27,13 @@ Dos particularidades del modelo que conviene tener presentes:
 
 | Rol | Descripción | Acceso |
 | --- | --- | --- |
-| **admin** | Administrador del sistema. Gestiona restaurantes, empleados y configuración. | web-admin |
+| **admin** | Administrador del sistema. Gestiona restaurantes, empleados y configuración. | web-admin, web-empleados (todas las vistas) |
 | **manager** | Gerente de restaurante. Gestiona los platos de su restaurante. | web-admin, web-empleados (todas las vistas) |
 | **cocinero** | Cocinero del restaurante. Prepara los pedidos. | web-empleados (cocina) |
 | **camarero** | Camarero del restaurante. Atiende barra y salón. | web-empleados (barra, salón) |
 | **cliente** | Cliente final. Hace pedidos. | web-clientes |
 
-El valor almacenado es `manager`; "gerente" es solo su traducción en la interfaz. La columna **Acceso** describe lo que muestra el menú de cada app, no una restricción real: en `web-empleados` el filtrado por rol es de navegación y las tres vistas son accesibles por URL para cualquier usuario con sesión. Quien decide de verdad es el middleware `authorize()` de la API.
+El valor almacenado es `manager`; "gerente" es solo su traducción en la interfaz. En `web-empleados`, camarero accede a barra y salón, cocinero a cocina, y manager y admin a las tres vistas. El acceso directo a una ruta y la navegación entre vistas se comprueban por rol; camarero inicia en `/barra`, cocinero en `/cocina`, y manager/admin en `/salon`. Sin sesión o con rol cliente, ausente o desconocido, la app redirige a `/login`. Esta restricción frontend guía la navegación y no sustituye la autorización de los endpoints de la API mediante `authorize()`.
 
 ### Estados de Pedido
 

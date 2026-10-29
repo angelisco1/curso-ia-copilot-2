@@ -97,11 +97,12 @@ El usuario ha confirmado que un camarero o cocinero que solicite una vista no pe
   - Comprobación: `npm run test -w @resttek/web-empleados -- --include=src/app/core/layout/shell.component.spec.ts` pasa después de observar el fallo inicial para admin. Camarero ve barra y salón; cocinero solo cocina; manager y admin las tres. Sin restaurante se mantiene el aviso y no se renderiza una página de trabajo. Logout conserva su llamada al servicio.
   - Evidencia TDD: se escribieron primero 9 pruebas de menú, estado sin restaurante y logout. El comando focalizado pasó ya antes del refactor: los enlaces de admin se habían incorporado en el commit `fd852c9` junto con T04/T05; no se forzó un rojo artificial. Tras sustituir las comparaciones de rol por `canAccessView` y eliminar `defaultRoute` sin uso, el mismo comando pasó de nuevo (9 pruebas); confirmó camarero con barra/salón, cocinero con cocina, manager/admin con las tres, roles no admitidos sin enlaces, el mensaje y outlet ausente sin restaurante y el logout.
 
-- [ ] **T07 (5 min)** Documentar la nueva restricción y cómo validarla
+- [x] **T07 (5 min)** ~~Documentar la nueva restricción y cómo validarla~~
   - Acción: sustituir la nota del glosario que describe el bypass por la nueva matriz, aclarar que admin también tiene acceso a web-empleados y documentar las redirecciones. En arquitectura frontend, describir la autorización local y el comando de pruebas del paquete, distinguiéndola del `authGuard` compartido y de la autorización efectiva de la API.
   - Archivos o componentes: `docs/dominio/glosario.md`, `docs/arquitectura/arquitectura-frontend.md`.
   - Dependencias: T05, T06.
   - Comprobación: revisión del diff frente a la matriz y al código; no quedan afirmaciones de que las tres vistas se pueden abrir con cualquier sesión y no se presenta el guard frontend como sustituto de la API.
+  - Evidencia: revisión de ambos documentos contra `employee-access.ts`, rutas y guards. La búsqueda de las afirmaciones obsoletas (`cualquier usuario con sesión`, bypass por URL y filtrado descrito como única protección) no encontró coincidencias; se documentaron matriz, destinos, `employeeRoleGuard`, diferencia con `authGuard`, límites frente a la API y comando de pruebas del workspace. No aplica rojo/verde por ser una tarea exclusivamente documental.
 
 - [ ] **T08 (10 min)** Validar la integración y registrar las evidencias finales
   - Acción: ejecutar todas las pruebas del paquete y su build de producción; comprobar en navegador acceso directo, recarga y navegación interna con los roles acordados y servicios locales disponibles. Revisar el diff final y actualizar las casillas de este plan solo con evidencias obtenidas.
@@ -137,9 +138,9 @@ Estimación total: **65 minutos**, sin contar bloqueos externos.
 - [x] **CA08** La corrección tiene validación automatizada ejecutable y compilación correcta.
   - Verificación: `npm run test -w @resttek/web-empleados` y `npm run build -w @resttek/web-empleados`, ambos con salida exitosa. Registrar resultados y advertencias; no usar `npm test` de la raíz como sustituto.
   - Evidencia: suite del paquete exitosa (2 archivos, 71 pruebas) y build de producción exitoso, ambos en el worktree de la tarea.
-- [ ] **CA09** La documentación representa el acceso real de las rutas.
+- [x] **CA09** La documentación representa el acceso real de las rutas.
   - Verificación: revisión de glosario y arquitectura contra la matriz y tests; se documenta la excepción admin confirmada por el usuario y se conserva la distinción entre guard frontend y autorización de la API.
-  - Evidencia: pendiente.
+  - Evidencia: glosario y arquitectura actualizados y contrastados con las pruebas del router y la política local; admin consta con acceso a las tres vistas y se aclara que la API conserva la autorización de endpoints.
 
 ## Reglas de seguimiento y finalización
 
