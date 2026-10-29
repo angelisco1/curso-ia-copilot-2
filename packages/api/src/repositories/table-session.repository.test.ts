@@ -190,4 +190,46 @@ describe('SqliteTableSessionRepository.occupy (integracion)', () => {
         expect((await repo.findById('s1'))?.endedAt).toBe(now)
         expect(await repo.findById('nope')).toBeNull()
     })
+
+    it('carrera: liberar una mesa mientras un cliente la ocupa nunca deja sesion abierta en mesa libre', async () => {
+        for (let i = 0; i < 5; i++) {
+            const tableId = `race-${i}`
+            await tables.create({ id: tableId, restaurantId: 'r1', number: 100 + i, description: '', capacity: 4, status: 'libre' })
+            const attempts = i % 2 === 0
+                ? [repo.occupy(params(`s${i}`, tableId, `c${i}`, 2)), tables.changeStatus('r1', tableId, 'libre')]
+                : [tables.changeStatus('r1', tableId, 'libre'), repo.occupy(params(`s${i}`, tableId, `c${i}`, 2))]
+            await Promise.allSettled(attempts)
+            const table = await tables.findById('r1', tableId)
+            const open = await db.all('SELECT id FROM table_sessions WHERE table_id = ? AND ended_at IS NULL', [tableId])
+            expect(open.length).toBe(table?.status === 'ocupada' ? 1 : 0)
+        }
+    })
+
+    it('carrera: borrar una mesa mientras un cliente la ocupa no deja sesion abierta en mesa borrada', async () => {
+        for (let i = 0; i < 4; i++) {
+            const tableId = `del-${i}`
+            await tables.create({ id: tableId, restaurantId: 'r1', number: 200 + i, description: '', capacity: 4, status: 'libre' })
+            const attempts = i % 2 === 0
+                ? [repo.occupy(params(`d${i}`, tableId, `c${i}`, 2)), tables.delete('r1', tableId)]
+                : [tables.delete('r1', tableId), repo.occupy(params(`d${i}`, tableId, `c${i}`, 2))]
+            const results = await Promise.allSettled(attempts)
+            const open = await db.all('SELECT id FROM table_sessions WHERE table_id = ? AND ended_at IS NULL', [tableId])
+            expect(open).toHaveLength(0)
+            expect(await tables.findById('r1', tableId)).toBeNull()
+            if (i % 2 === 1) {
+                const occupy = results[1] as PromiseRejectedResult
+                expect(occupy.status).toBe('rejected')
+                expect(occupy.reason).toBeInstanceOf(TableNotFoundError)
+            }
+        }
+    })
+
+    it('carrera: cambio manual a ocupada y ocupacion de cliente simultaneos dejan una sola sesion', async () => {
+        const results = await Promise.allSettled([
+            repo.occupy(params('s1', 't1', 'c1', 2)),
+            tables.changeStatus('r1', 't1', 'ocupada')
+        ])
+        expect(results.every(r => r.status === 'fulfilled')).toBe(true)
+        expect(await openSessions()).toHaveLength(1)
+    })
 })

@@ -228,3 +228,9 @@ export class ActiveTableSessionExistsError extends AppError {
         super('Client already has an active table session in this restaurant')
     }
 }
+
+export class TableCapacityConflictError extends AppError {
+    constructor() {
+        super('Capacity cannot be lower than the active party size')
+    }
+}
