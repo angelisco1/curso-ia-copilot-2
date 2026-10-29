@@ -229,10 +229,11 @@ Propiedad: `packages/web-empleados/**`. Mantener intacta la matriz de acceso exi
   - Dependencias: T01, T02.
   - Comprobación: tests de HTTP verifican consulta, PATCH y pedidos de sesión actual; campos opcionales históricos compatibles.
   - Evidencia: specs `table.service.spec.ts` (3 casos HTTP: GET mesas, PATCH `/status` con `{status}`, GET `/tables/:id/orders`; campo histórico opcional). Rojo comprobado: cambiar `patch` por `put` en el servicio hace fallar el spec; con el servicio real pasa. `npm run test -w @resttek/web-empleados` verde.
-- [ ] **T27 (10 min)** Añadir store de mesas con refresco y cancelación de ciclo
+- [x] **T27 (10 min)** ~~Añadir store de mesas con refresco y cancelación de ciclo~~
   - Archivos: `packages/web-empleados/src/app/features/tables/store/table.store.ts`, `table.store.spec.ts` (nuevos).
   - Dependencias: T26.
   - Comprobación: carga inicial y polling de 30 s, un único intervalo, limpieza al destruir/cambiar restaurante; respuestas tardías descartadas, errores visibles sin falsos éxitos.
+  - Evidencia: `table.store.spec.ts` (14 casos, fake timers): carga inicial, polling 30 s con un único intervalo (también tras reiniciar), `stopPolling`, respuesta tardía de otro restaurante descartada, error visible sin vaciar mesas, PATCH sin actualizar antes del éxito, doble envío bloqueado, error de servidor, detalle por mesa/sesión (tardías descartadas, última petición gana, liberar limpia). Mutaciones que hacen fallar el spec: quitar la generación al cargar, no limpiar el intervalo, quitar el bloqueo de doble envío, quitar el contador de petición de detalle. `npm run test -w @resttek/web-empleados` verde (23 tests).
 - [ ] **T28 (10 min)** Mostrar en salón todas las mesas con sus estados
   - Archivos: `packages/web-empleados/src/app/features/orders/pages/salon/salon.component.{ts,html,css}`, `salon.component.spec.ts` (nuevo); componente presentacional de mesa dentro de `features/tables/` si se reutiliza.
   - Dependencias: T27.
