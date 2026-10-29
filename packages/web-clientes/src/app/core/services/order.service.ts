@@ -9,10 +9,17 @@ export class OrderService {
   private readonly http = inject(HttpClient)
   private readonly apiUrl = inject(API_URL)
 
-  createOrder(restaurantId: string, items: { dishId: string; quantity: number; notes: string | null }[]): Observable<Order> {
+  createOrder(
+    restaurantId: string,
+    tableId: string,
+    tableSessionId: string,
+    items: { dishId: string; quantity: number; notes: string | null }[]
+  ): Observable<Order> {
+    // El cliente lo identifica el JWT: nunca se envía clientId.
     return this.http.post<Order>(`${this.apiUrl}/orders`, {
       restaurantId,
-      tableId: null,
+      tableId,
+      tableSessionId,
       items
     })
   }

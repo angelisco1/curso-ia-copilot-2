@@ -7,6 +7,10 @@
     </div>
   </div>
 
+  @if (notice(); as info) {
+    <div class="alert-error" role="alert" data-testid="notice">{{ info }}</div>
+  }
+
   @if (actionError(); as message) {
     <div class="alert-error" role="alert" data-testid="action-error">{{ message }}</div>
   }

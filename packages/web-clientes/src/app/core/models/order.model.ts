@@ -17,4 +17,8 @@ export interface Order {
   clientId: string | null
   createdAt: string
   items: OrderItem[]
+  /** Campos de ocupación: pueden faltar (pedidos históricos o respuestas antiguas) o ser null. */
+  tableSessionId?: string | null
+  tableNumber?: number | null
+  tableSessionEndedAt?: string | null
 }

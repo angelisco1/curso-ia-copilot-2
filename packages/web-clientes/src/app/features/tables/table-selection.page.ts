@@ -28,6 +28,8 @@ export class TableSelectionPage implements OnInit, OnDestroy {
   readonly selectedTableId = signal<string | null>(null)
   readonly saving = signal(false)
   readonly actionError = signal<string | null>(null)
+  /** Aviso recibido al volver aquí desde otra pantalla (p. ej. mesa liberada al enviar el pedido). */
+  readonly notice = signal<string | null>(null)
   /** Grupo válido (entero positivo) o null. */
   readonly partySize = computed<number | null>(() => {
     const raw = this.partyInput().trim()
@@ -47,6 +49,8 @@ export class TableSelectionPage implements OnInit, OnDestroy {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id') ?? ''
     this.restaurantId.set(id)
+    const notice = (typeof history !== 'undefined' ? history.state : null)?.notice
+    if (typeof notice === 'string' && notice) this.notice.set(notice)
     this.sessionStore.load(id).subscribe({ error: () => {} })
   }
 

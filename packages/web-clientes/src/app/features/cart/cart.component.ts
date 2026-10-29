@@ -1,8 +1,10 @@
-import { Component, inject, signal } from '@angular/core'
+import { Component, computed, inject, signal } from '@angular/core'
 import { Router, RouterLink } from '@angular/router'
 import { DecimalPipe } from '@angular/common'
 import { CartStore } from '../../core/store/cart.store'
+import { TableSessionStore } from '../../core/store/table-session.store'
 import { OrderService } from '../../core/services/order.service'
+import { describeTableError, isSessionErrorCode, parseApiError } from '../../core/models/api-error'
 
 @Component({
   selector: 'app-cart',
@@ -45,6 +47,11 @@ import { OrderService } from '../../core/services/order.service'
 
           <aside class="order-summary card">
             <h3>Resumen</h3>
+            @if (occupation(); as occ) {
+              <p class="table-info" data-testid="table-info">
+                Mesa {{ occ.table.number }}@if (occ.session.partySize) { · {{ occ.session.partySize }} personas }
+              </p>
+            }
             <div class="summary-row">
               <span>Items ({{ cartStore.itemCount() }})</span>
               <span>{{ cartStore.total() | number:'1.2-2' }} €</span>
@@ -53,7 +60,7 @@ import { OrderService } from '../../core/services/order.service'
               <span>Total</span>
               <strong>{{ cartStore.total() | number:'1.2-2' }} €</strong>
             </div>
-            <button class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 16px;" 
+            <button class="btn btn-primary" data-testid="confirm-order" style="width: 100%; justify-content: center; margin-top: 16px;" 
                     [disabled]="loading()" (click)="confirmOrder()">
               @if (loading()) {
                 Confirmando...
@@ -72,6 +79,11 @@ import { OrderService } from '../../core/services/order.service'
     </div>
   `,
   styles: [`
+    .table-info {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin: 4px 0 12px;
+    }
     .container {
       max-width: 900px;
       margin: 0 auto;
@@ -170,11 +182,17 @@ import { OrderService } from '../../core/services/order.service'
 })
 export class CartComponent {
   readonly cartStore = inject(CartStore)
+  private readonly sessionStore = inject(TableSessionStore)
   private readonly orderService = inject(OrderService)
   private readonly router = inject(Router)
 
   readonly loading = signal(false)
   readonly error = signal<string | null>(null)
+  readonly occupation = computed(() => {
+    const restaurantId = this.cartStore.restaurantId()
+    const occupation = restaurantId ? this.sessionStore.occupationFor(restaurantId) : null
+    return occupation && occupation.session.id === this.cartStore.sessionId() ? occupation : null
+  })
 
   increment(dishId: string): void {
     const item = this.cartStore.items().find(i => i.dish.id === dishId)
@@ -196,7 +214,16 @@ export class CartComponent {
 
   confirmOrder(): void {
     const restaurantId = this.cartStore.restaurantId()
-    if (!restaurantId || this.cartStore.items().length === 0) return
+    if (this.loading() || !restaurantId || this.cartStore.items().length === 0) return
+
+    const occupation = this.occupation()
+    if (!occupation) {
+      // Sin visita vigente no se envía nada: se vuelve a elegir mesa.
+      this.backToTableSelection(restaurantId, describeTableError(
+        { status: null, code: 'TableSessionRequiredError', message: null }, ''
+      ))
+      return
+    }
 
     this.loading.set(true)
     this.error.set(null)
@@ -207,15 +234,28 @@ export class CartComponent {
       notes: item.notes || null
     }))
 
-    this.orderService.createOrder(restaurantId, items).subscribe({
+    this.orderService.createOrder(restaurantId, occupation.table.id, occupation.session.id, items).subscribe({
       next: (order) => {
         this.cartStore.clear()
         this.router.navigate(['/orders', order.id])
       },
       error: (err) => {
+        const parsed = parseApiError(err)
+        if (isSessionErrorCode(parsed.code)) {
+          // La visita ya no es válida: no se reenvía el carrito a otra mesa.
+          this.loading.set(false)
+          this.backToTableSelection(restaurantId, describeTableError(parsed, ''))
+          return
+        }
         this.error.set('Error al confirmar el pedido. Inténtalo de nuevo.')
         this.loading.set(false)
       }
     })
+  }
+
+  private backToTableSelection(restaurantId: string, notice: string): void {
+    this.sessionStore.clear()
+    this.cartStore.reset()
+    this.router.navigate(['/restaurants', restaurantId, 'tables'], { state: { notice } })
   }
 }

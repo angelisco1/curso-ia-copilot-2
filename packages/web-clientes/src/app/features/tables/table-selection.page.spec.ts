@@ -272,6 +272,15 @@ describe('TableSelectionPage (confirmación)', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
+  it('muestra el aviso recibido al volver por una sesión cerrada', () => {
+    history.replaceState({ notice: 'Tu mesa ha sido liberada. Elige una mesa para continuar.' }, '')
+    const second = TestBed.createComponent(TableSelectionPage)
+    second.detectChanges()
+    history.replaceState(null, '')
+    expect((second.nativeElement as HTMLElement).querySelector('[data-testid="notice"]')?.textContent).toContain('liberada')
+    expect(el().querySelector('[data-testid="notice"]')).toBeNull()
+  })
+
   it('un fallo de red conserva la selección para reintentar', () => {
     service.confirmOccupation.mockReturnValueOnce(throwError(() => ({ status: 0, error: null })))
     chooseTable()
