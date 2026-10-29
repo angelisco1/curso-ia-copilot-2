@@ -18,5 +18,12 @@
       <h3>Empleados</h3>
       <p>Administra el equipo de trabajo</p>
     </a>
+    @if (isAdmin()) {
+      <a [routerLink]="['..', 'tables']" class="dash-card">
+        <lucide-icon name="layout-grid" [size]="28"></lucide-icon>
+        <h3>Mesas</h3>
+        <p>Gestiona las mesas y su capacidad</p>
+      </a>
+    }
   </div>
 </div>
