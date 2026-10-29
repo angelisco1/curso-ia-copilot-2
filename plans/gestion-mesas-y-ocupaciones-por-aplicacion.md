@@ -221,11 +221,11 @@ Propiedad: `packages/web-admin/**`. No modificar API, otros frontends ni documen
   - Dependencias: T23.
   - Comprobación: navegar A→B con componente reutilizado actualiza listado y rutas de acciones; fallo HTTP no borra fila ni notifica éxito; cancelar confirmación no llama al servidor.
   - Evidencia: Rojo: `tables.navigation.spec.ts` (8 tests con store y HTTP reales, `HttpTestingController`) → 7 pasan y 1 falla: el formulario de edición no recargaba al pasar de restaurante/mesa A a B (defecto real: `TableFormPage` leía `restaurantId` e `id` del snapshot y la page se reutiliza). Verde: `restaurantId`, `tableId`, `isEditing`, `pageTitle` y `listUrl` pasan a signals/computed reactivos a `paramMap` (padre e hija), con descarte de cargas/envíos obsoletos; suite admin completa → 13 archivos, 87 tests pasan. Verificado: listado A→B recarga contra B, respuesta tardía de A ignorada, fallo HTTP al borrar mantiene la fila, borrado correcto, cancelar `confirm` no llama a la API, error de carga y 409 al guardar visibles.
-- [ ] **T25 (5 min)** Validar el paquete admin y registrar evidencia
+- [x] **T25 (5 min)** ~~Validar el paquete admin y registrar evidencia~~
   - Archivos: este plan.
   - Dependencias: T17, T24.
   - Comprobación: `npm run test -w @resttek/web-admin` y `npm run build -w @resttek/web-admin`; prueba manual CRUD con API real, incluidos número duplicado y capacidad insuficiente durante ocupación.
-  - Evidencia parcial: `npm run test -w @resttek/web-admin` → 13 archivos, 87 tests pasan; `npm run build -w @resttek/web-admin` → exit 0 (bundle generado, chunk lazy `table-list-page`). PENDIENTE (tarea no marcada): prueba manual CRUD contra API real (alta, edición, borrado, número duplicado y capacidad insuficiente con mesa ocupada); depende de T17 (API), no disponible en este worktree. No se ha ejecutado ni se declara resultado.
+  - Evidencia (agente admin): revisión T18–T24 contra `git show 21/gestion-mesas:packages/api/docs/tables.openapi.yaml`: paths (`/api/v1/restaurants/:id/tables[/:tableId]`), métodos (GET/POST/PUT/DELETE; PATCH de estado no usado por admin), DTOs (`CreateTableDto`, `UpdateTableDto` con los cuatro campos obligatorios) y `Mesa` coinciden; el mapeo de 409 del formulario se basa en `error`/`message` (`TableNumberConflictError`, `TableCapacityConflictError`) y 404 (`TableNotFoundError`) y es correcto; no hubo que corregir código. `npm run test -w @resttek/web-admin` → 13 archivos, 87 tests pasan; `npm run build -w @resttek/web-admin` → exit 0. Prueba contra API real SIN navegador: API de `21/gestion-mesas` (commit 9cc7205) en worktree desacoplado temporal con BD propia y `npm run seed`, `PORT=3011`; script curl (`login` admin/gerente1/cliente1) que reproduce las peticiones exactas de `TableService` (no se arrancó `ng serve`; no se probó en navegador). Resultados: POST alta → 201 (id nuevo, `activeSessionId` null); POST número duplicado → 409 `TableNumberConflictError`; PUT edición (número 50, capacidad 6, estado reservada→libre) → 200 con el mismo id; cliente1 ocupa la mesa con `partySize` 5 (POST `table-sessions` → 201); PUT capacidad 3 → 409 `TableCapacityConflictError` y la mesa queda intacta; PUT capacidad 5 → 200; manager POST → 403; DELETE de mesa ocupada por cliente → 204; GET/DELETE/PUT de la mesa borrada → 404 `TableNotFoundError`; el número 50 se reutiliza tras el borrado (201). Worktree temporal y proceso API eliminados. Limitación: la UI (cargas, mensajes) solo está cubierta por tests de componente con HTTP simulado.
 
 ### C. Empleados — agente Frontend Angular, alcance web-empleados
 
@@ -344,6 +344,7 @@ Propiedad: documentación general y seguimiento final. No utilizar esta fase par
 Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí mencionadas aún no existen.
 
 - [ ] **CA01 — CRUD por restaurante.** Admin crea, lista, edita y borra mesas con sus cinco campos; el id permanece estable al editar.
+  - Evidencia parcial (solo admin, API real por curl + tests de componente; no marcado porque falta la verificación en navegador y de las demás apps): alta/edición/borrado correctos y id estable al editar (ver T25).
   - Verificación: tests HTTP y admin; navegador en dos restaurantes, editar descripción/capacidad/estado y comprobar persistencia tras recarga.
   - Evidencia: pendiente.
 - [ ] **CA02 — Validación y unicidad.** Número/capacidad/grupo son enteros positivos; los estados válidos son exactamente tres; número duplicado solo se prohíbe entre mesas activas del mismo restaurante.
@@ -380,6 +381,7 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Verificación: consulta de pedido anterior sigue funcionando; disponibilidad/listados no incluyen mesa; recrear mismo número obtiene id nuevo y no hereda pedidos.
   - Evidencia: pendiente.
 - [ ] **CA13 — Autorización y pertenencia.** Solo admin dispone de CRUD; manager/camarero solo cambian mesas de su restaurante; cliente solo opera su ocupación.
+  - Evidencia parcial (solo admin; no marcado): rutas `restaurants/:restaurantId/tables` con `adminGuard` (comprobado en `tables.routes.spec.ts`; manager bloqueado en URL por el guard, sin prueba en navegador) y API real devuelve 403 al manager en POST. Falta camarero/cliente y las demás apps.
   - Verificación: matriz HTTP por rol/restaurante, sin JWT y con ids cruzados; 401/403/404 según contrato; manager bloqueado en URL de CRUD admin; disponibilidad sin datos personales.
   - Evidencia: pendiente.
 - [ ] **CA14 — Compatibilidad de datos existentes.** Inicializar una BD anterior añade esquema sin borrar datos y pedidos sin sesión siguen consultables/preparables/entregables.
@@ -389,9 +391,11 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Verificación: tests de store y recorrido cambiar restaurante/visita, confirmar y pedir de nuevo; logout/login con usuario distinto.
   - Evidencia: pendiente.
 - [ ] **CA16 — Errores y refresco fiables.** Carga/error/vacío tienen presentación explícita; fallos no simulan éxito; las respuestas tardías no cruzan restaurante, grupo ni visita.
+  - Evidencia parcial (solo admin; no marcado): carga/error/vacío del listado y del formulario, error de borrado sin simular éxito y descarte de respuestas tardías entre restaurantes cubiertos por tests (T20, T24). Falta empleados/clientes.
   - Verificación: tests con respuestas HTTP invertidas, 409 y fallo de red en cada app; timers de empleados se detienen al salir y no se duplican al volver.
   - Evidencia: pendiente.
 - [ ] **CA17 — Capacidad y cambios administrativos coherentes.** No se reduce capacidad por debajo del grupo activo; PUT, PATCH y borrado mantienen el ciclo de sesiones.
+  - Evidencia parcial (solo admin; no marcado): API real devuelve 409 `TableCapacityConflictError` al bajar la capacidad bajo el grupo activo (5 personas), conserva la mesa; borrado de mesa ocupada por cliente → 204 y luego 404; el formulario muestra mensaje específico (T22). Probado por curl, no en navegador.
   - Verificación: grupo 4, intentar capacidad 2 devuelve 409; capacidad 4 válida; cambiar ocupada a reservada cierra sesión; repetir ocupada no abre otra.
   - Evidencia: pendiente.
 - [ ] **CA18 — Validación técnica y documentación.** Tests, tipos y builds afectados pasan; documentación describe el flujo real.
