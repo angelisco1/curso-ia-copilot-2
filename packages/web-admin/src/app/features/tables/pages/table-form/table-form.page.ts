@@ -1,9 +1,9 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core'
-import { toSignal } from '@angular/core/rxjs-interop'
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core'
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop'
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, type ValidationErrors } from '@angular/forms'
 import { ActivatedRoute, Router, RouterLink } from '@angular/router'
 import { LucideAngularModule } from 'lucide-angular'
-import { firstValueFrom, startWith } from 'rxjs'
+import { combineLatest, distinctUntilChanged, firstValueFrom, map, startWith } from 'rxjs'
 import { TABLE_STATUSES, type TableStatus } from '../../models/table.model'
 import { TableService } from '../../services/table.service'
 import { TableStore } from '../../store/table.store'
@@ -34,14 +34,16 @@ export class TableFormPage implements OnInit {
     reservada: 'Reservada'
   }
 
-  readonly restaurantId = this.route.parent?.snapshot.params['restaurantId'] ?? ''
-  readonly tableId = this.route.snapshot.paramMap.get('id')
-  readonly isEditing = this.tableId !== null
+  readonly restaurantId = signal('')
+  readonly tableId = signal<string | null>(null)
+  readonly isEditing = computed(() => this.tableId() !== null)
   readonly loading = signal(false)
   readonly loadFailed = signal(false)
   readonly saving = signal(false)
   readonly error = signal<string | null>(null)
   private originalStatus: TableStatus | null = null
+  private loadSequence = 0
+  private readonly destroyRef = inject(DestroyRef)
 
   readonly form = this.fb.group({
     number: this.fb.control<number | null>(null, positiveInteger),
@@ -57,20 +59,43 @@ export class TableFormPage implements OnInit {
     () => this.formStatus() !== 'VALID' || this.saving() || this.loading() || this.loadFailed()
   )
 
-  readonly pageTitle = this.isEditing ? 'Editar mesa' : 'Nueva mesa'
-  readonly listUrl = `/restaurants/${this.restaurantId}/tables`
+  readonly pageTitle = computed(() => (this.isEditing() ? 'Editar mesa' : 'Nueva mesa'))
+  readonly listUrl = computed(() => `/restaurants/${this.restaurantId()}/tables`)
 
   ngOnInit(): void {
-    if (this.tableId) {
-      void this.loadTable(this.tableId)
-    }
+    // La page se reutiliza al cambiar de restaurante o de mesa: reaccionar a los parámetros.
+    combineLatest([
+      this.route.parent?.paramMap.pipe(map(p => p.get('restaurantId') ?? '')) ?? [''],
+      this.route.paramMap.pipe(map(p => p.get('id')))
+    ]).pipe(
+      distinctUntilChanged(([r1, t1], [r2, t2]) => r1 === r2 && t1 === t2),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(([restaurantId, tableId]) => {
+      this.restaurantId.set(restaurantId)
+      this.tableId.set(tableId)
+      this.resetState()
+      if (restaurantId && tableId) {
+        void this.loadTable(restaurantId, tableId)
+      }
+    })
   }
 
-  private async loadTable(id: string): Promise<void> {
-    this.loading.set(true)
+  private resetState(): void {
+    this.loadSequence++
+    this.originalStatus = null
     this.error.set(null)
+    this.loadFailed.set(false)
+    this.loading.set(false)
+    this.saving.set(false)
+    this.form.reset({ number: null, description: '', capacity: null, status: 'libre' })
+  }
+
+  private async loadTable(restaurantId: string, id: string): Promise<void> {
+    const sequence = this.loadSequence
+    this.loading.set(true)
     try {
-      const table = await firstValueFrom(this.service.getById(this.restaurantId, id))
+      const table = await firstValueFrom(this.service.getById(restaurantId, id))
+      if (sequence !== this.loadSequence) return
       this.originalStatus = table.status
       this.form.setValue({
         number: table.number,
@@ -79,10 +104,11 @@ export class TableFormPage implements OnInit {
         status: table.status
       })
     } catch (err) {
+      if (sequence !== this.loadSequence) return
       this.loadFailed.set(true)
       this.error.set(this.describeError(err, 'No se pudo cargar la mesa.'))
     } finally {
-      this.loading.set(false)
+      if (sequence === this.loadSequence) this.loading.set(false)
     }
   }
 
@@ -97,7 +123,10 @@ export class TableFormPage implements OnInit {
     if (this.form.invalid) return
 
     const { number, description, capacity, status } = this.form.getRawValue()
-    if (this.isEditing && this.originalStatus === 'ocupada' && status !== 'ocupada') {
+    const restaurantId = this.restaurantId()
+    const tableId = this.tableId()
+    const sequence = this.loadSequence
+    if (tableId !== null && this.originalStatus === 'ocupada' && status !== 'ocupada') {
       const accepted = confirm(
         `Vas a cambiar la mesa de ocupada a ${this.statusLabels[status].toLowerCase()}: se cerrará su ocupación actual. ` +
         'Puede haber pedidos pendientes; no se eliminan ni se cancelan y seguirán en cocina y barra. ¿Continuar?'
@@ -108,26 +137,21 @@ export class TableFormPage implements OnInit {
     this.error.set(null)
     this.saving.set(true)
     try {
-      if (this.tableId) {
-        await this.store.update(this.restaurantId, this.tableId, {
-          number: number as number,
-          description,
-          capacity: capacity as number,
-          status
-        })
+      const dto = { number: number as number, description, capacity: capacity as number, status }
+      if (tableId) {
+        await this.store.update(restaurantId, tableId, dto)
       } else {
-        await this.store.create(this.restaurantId, {
-          number: number as number,
-          description,
-          capacity: capacity as number,
-          status
-        })
+        await this.store.create(restaurantId, dto)
       }
-      await this.router.navigateByUrl(this.listUrl)
+      if (sequence === this.loadSequence) {
+        await this.router.navigateByUrl(`/restaurants/${restaurantId}/tables`)
+      }
     } catch (err) {
-      this.error.set(this.describeError(err, 'No se pudo guardar la mesa. Inténtalo de nuevo.'))
+      if (sequence === this.loadSequence) {
+        this.error.set(this.describeError(err, 'No se pudo guardar la mesa. Inténtalo de nuevo.'))
+      }
     } finally {
-      this.saving.set(false)
+      if (sequence === this.loadSequence) this.saving.set(false)
     }
   }
 
@@ -141,7 +165,7 @@ export class TableFormPage implements OnInit {
       if (detail.includes('capacity')) {
         return 'La capacidad no puede ser menor que el grupo que ocupa la mesa actualmente.'
       }
-      if (detail.includes('number') || !this.isEditing) {
+      if (detail.includes('number') || !this.isEditing()) {
         return 'Ya existe una mesa con ese número en este restaurante.'
       }
       return 'Conflicto al guardar: el número ya existe en este restaurante o la capacidad es menor que el grupo que ocupa la mesa.'
