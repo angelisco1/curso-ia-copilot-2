@@ -104,40 +104,41 @@ El usuario ha confirmado que un camarero o cocinero que solicite una vista no pe
   - Comprobación: revisión del diff frente a la matriz y al código; no quedan afirmaciones de que las tres vistas se pueden abrir con cualquier sesión y no se presenta el guard frontend como sustituto de la API.
   - Evidencia: revisión de ambos documentos contra `employee-access.ts`, rutas y guards. La búsqueda de las afirmaciones obsoletas (`cualquier usuario con sesión`, bypass por URL y filtrado descrito como única protección) no encontró coincidencias; se documentaron matriz, destinos, `employeeRoleGuard`, diferencia con `authGuard`, límites frente a la API y comando de pruebas del workspace. No aplica rojo/verde por ser una tarea exclusivamente documental.
 
-- [ ] **T08 (10 min)** Validar la integración y registrar las evidencias finales
+- [x] **T08 (10 min)** ~~Validar la integración y registrar las evidencias finales~~
   - Acción: ejecutar todas las pruebas del paquete y su build de producción; comprobar en navegador acceso directo, recarga y navegación interna con los roles acordados y servicios locales disponibles. Revisar el diff final y actualizar las casillas de este plan solo con evidencias obtenidas.
   - Archivos o componentes: web-empleados y este plan.
   - Dependencias: T05, T06, T07.
   - Comprobación: `npm run test -w @resttek/web-empleados` y `npm run build -w @resttek/web-empleados` terminan correctamente. Para la comprobación manual, usar `npm run dev:api` y `npm run dev:empleados` solo si no hay servicios disponibles, verificar respuesta en 3000/4201 y detener los procesos propios al terminar. No ejecutar `seed` sobre datos existentes sin autorización. Si faltan cuentas o servicios, dejar la comprobación pendiente y registrar el bloqueo.
+  - Evidencia: `npm run test -w @resttek/web-empleados` pasó (3 archivos, 81 pruebas) y `npm run build -w @resttek/web-empleados` terminó correctamente. `npm run seed` terminó con código 0 tras el arreglo del orden de inserción autorizado por el usuario. En navegador con servicios en 3000/4201, camarero inició en `/barra`, accedió directamente y recargó `/barra` y `/salon`, navegó internamente a salón y fue redirigido desde `/cocina` a `/barra`; cocinero inició en `/cocina`, la recargó y fue redirigido desde `/barra` y `/salon` a cocina; manager y admin iniciaron en `/salon`, abrieron directamente y recargaron las tres vistas, y navegaron entre ellas. La cuenta admin se asoció temporalmente a `rest-1` con autorización expresa para esta prueba y se restauró a `restaurant_id = NULL` después; se verificó la restauración. El proceso preexistente que ocupaba inicialmente 4201 fue cancelado por el usuario antes de iniciar las pruebas; los servicios iniciados para T08 se detuvieron al concluir.
 
 Estimación total: **65 minutos**, sin contar bloqueos externos.
 
 ## Criterios de aceptación
 
-- [ ] **CA01** Un camarero puede entrar a `/barra` y `/salon`, pero no a `/cocina`.
+- [x] **CA01** Un camarero puede entrar a `/barra` y `/salon`, pero no a `/cocina`.
   - Verificación: pruebas parametrizadas de política y router; `/cocina` termina en `/barra` sin activar CocinaComponent ni iniciar su carga de pedidos. Comprobación manual por URL y recarga.
-  - Evidencia: pendiente.
-- [ ] **CA02** Un cocinero puede entrar a `/cocina`, pero ni a `/barra` ni a `/salon`.
+  - Evidencia: pruebas automatizadas de política/router pasan. En navegador, el login de camarero abrió `/barra`; el acceso directo y recarga de `/barra` se mantuvieron, `/cocina` redirigió a `/barra`, y la navegación interna y directa con recarga de `/salon` funcionó.
+- [x] **CA02** Un cocinero puede entrar a `/cocina`, pero ni a `/barra` ni a `/salon`.
   - Verificación: pruebas de las tres rutas; las dos denegaciones terminan en `/cocina` sin activar BarraComponent o SalonComponent. Comprobación manual por URL y recarga.
-  - Evidencia: pendiente.
-- [ ] **CA03** Manager y admin pueden abrir las tres vistas.
+  - Evidencia: pruebas automatizadas de política/router pasan. En navegador, el login de cocinero abrió `/cocina`, que se mantuvo tras recargar; los accesos directos a `/barra` y `/salon` redirigieron a `/cocina`.
+- [x] **CA03** Manager y admin pueden abrir las tres vistas.
   - Verificación: seis casos de router con `restaurantId` válido; URL final y componente corresponden a la ruta solicitada. El shell muestra los tres enlaces.
-  - Evidencia: pendiente.
-- [ ] **CA04** La autorización se vuelve a evaluar al cambiar entre rutas hijas.
+  - Evidencia: pruebas del router pasan para las seis rutas manager/admin con `restaurantId`; las pruebas del shell confirman los tres enlaces. En navegador, ambas cuentas autenticaron con `restaurantId` válido durante la prueba, abrieron y recargaron `/barra`, `/salon` y `/cocina`, y navegaron por los tres enlaces. La asignación temporal del admin fue restaurada a `NULL`.
+- [x] **CA04** La autorización se vuelve a evaluar al cambiar entre rutas hijas.
   - Verificación: router ya situado en `/barra` como camarero solicita `/cocina` y vuelve a `/barra`; router ya situado en cocina como cocinero solicita barra y salón y permanece en cocina. Probar también el cambio permitido barra→salón y el recorrido completo de manager/admin.
-  - Evidencia: pendiente.
-- [ ] **CA05** La entrada por `/` y la navegación a `/` posterior al login respetan el rol.
-  - Verificación: router con sesiones representativas termina en barra para camarero y en cocina para cocinero/manager/admin; el login compartido sigue navegando a `/` sin cambios. No hay redirecciones repetidas ni estados de navegación bloqueados.
-  - Evidencia: pendiente.
-- [ ] **CA06** No hay acceso con sesión ausente o rol no admitido.
+  - Evidencia: pruebas del router pasan para denegaciones y acceso permitido del camarero, denegaciones del cocinero y recorridos de manager/admin.
+- [x] **CA05** La entrada por `/` y la navegación a `/` posterior al login respetan el rol.
+  - Verificación: router con sesiones representativas termina en barra para camarero, en cocina para cocinero y en salón para manager/admin; el login compartido sigue navegando a `/` sin cambios. No hay redirecciones repetidas ni estados de navegación bloqueados.
+  - Evidencia: las pruebas del router verifican el destino inicial por rol y sin bucles; en navegador, camarero inició en `/barra`, cocinero en `/cocina`, y manager y admin en `/salon`. El login compartido no se modificó.
+- [x] **CA06** No hay acceso con sesión ausente o rol no admitido.
   - Verificación: cliente, rol nulo y desconocido con token, así como cada rol autorizado sin token, solicitan las tres vistas y terminan en `/login`, sin activar páginas de trabajo. Los rechazos por rol no borran la sesión y permiten salir o volver a iniciar sesión mediante la pantalla existente.
-  - Evidencia: pendiente.
-- [ ] **CA07** Se conserva la experiencia existente salvo los cambios expresamente acordados.
+  - Evidencia: pruebas del router pasan para roles cliente/nulo/desconocido y roles válidos sin sesión; confirman no activar páginas de trabajo ni llamar a `clearSession`. El logout existente también está cubierto por las pruebas del shell.
+- [x] **CA07** Se conserva la experiencia existente salvo los cambios expresamente acordados.
   - Verificación: specs del shell confirman enlaces por rol, aviso sin restaurante y logout; las pruebas de router comprueban `/login` y not-found para una URL inexistente. No se modifican web-shared ni otras aplicaciones.
-  - Evidencia: pendiente.
+  - Evidencia: pruebas del shell confirman menú, aviso sin restaurante, outlet ausente y logout; la prueba del router confirma not-found para URL desconocida. No se modificaron web-shared ni otras aplicaciones.
 - [x] **CA08** La corrección tiene validación automatizada ejecutable y compilación correcta.
   - Verificación: `npm run test -w @resttek/web-empleados` y `npm run build -w @resttek/web-empleados`, ambos con salida exitosa. Registrar resultados y advertencias; no usar `npm test` de la raíz como sustituto.
-  - Evidencia: suite del paquete exitosa (2 archivos, 71 pruebas) y build de producción exitoso, ambos en el worktree de la tarea.
+  - Evidencia: suite del paquete exitosa (3 archivos, 81 pruebas) y build de producción exitoso, ambos en el worktree de la tarea.
 - [x] **CA09** La documentación representa el acceso real de las rutas.
   - Verificación: revisión de glosario y arquitectura contra la matriz y tests; se documenta la excepción admin confirmada por el usuario y se conserva la distinción entre guard frontend y autorización de la API.
   - Evidencia: glosario y arquitectura actualizados y contrastados con las pruebas del router y la política local; admin consta con acceso a las tres vistas y se aclara que la API conserva la autorización de endpoints.
@@ -155,7 +156,7 @@ Estimación total: **65 minutos**, sin contar bloqueos externos.
 ## Dudas y preguntas pendientes
 
 - **Ninguna duda funcional bloqueante en este momento.** El usuario confirmó redirección a vista permitida para camarero/cocinero y acceso total para admin.
-- **Disponibilidad de servicios y cuentas para la validación manual:** pendiente de comprobar durante T08; no bloquea la implementación ni las pruebas automatizadas, pero sí su verificación manual y, si falta evidencia, el cierre completo. No se han verificado usuarios de prueba ni ejecutado el seed.
+- **Sin bloqueos pendientes.** La cuenta admin se probó con `rest-1` asignado temporalmente tras autorización expresa; la base de datos se restauró a su valor original (`restaurant_id = NULL`) y ambos servicios temporales se detuvieron.
 
 ## Decisiones tomadas durante la planificación
 

@@ -15,6 +15,7 @@ import {
 import { AuthService, AuthStore, LoginComponent } from '@resttek/web-shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { routes } from './app.routes'
+import { NotFoundComponent } from './core/layout/not-found.component'
 import { BarraComponent } from './features/orders/pages/barra/barra.component'
 import { CocinaComponent } from './features/orders/pages/cocina/cocina.component'
 import { SalonComponent } from './features/orders/pages/salon/salon.component'
@@ -174,6 +175,15 @@ describe('employee routes', () => {
 
     expect(router.url).toBe(expectedPath)
     expect(activeComponent()).toBe(componentForPath(expectedPath))
+  })
+
+  it('keeps the not-found route for an unknown URL', async () => {
+    const harness = await RouterTestingHarness.create()
+
+    await harness.navigateByUrl('/missing-route')
+
+    expect(router.url).toBe('/missing-route')
+    expect(activeComponent()).toBe(NotFoundComponent)
   })
 
   it.each(unauthenticatedRouteCases)(
