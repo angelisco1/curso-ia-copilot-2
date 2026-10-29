@@ -120,10 +120,11 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
   - Dependencias: T01.
   - Comprobación: ejemplos con/sin sesión histórica, petición de cliente con sesión propia y respuesta con mesa; conservar expansión por unidad y categorías.
   - Evidencia: tarea documental, no aplica rojo/verde. `npx --yes @apidevtools/swagger-cli validate packages/api/docs/orders.openapi.yaml` válido; `npx --yes @redocly/cli@latest lint --extends minimal packages/api/docs/orders.openapi.yaml` sin errores, con avisos no bloqueantes de `servers: localhost` y esquema `CategoriaPlato` sin referencia. Los agentes admin, empleados y clientes revisaron el contrato completo y aprobaron iniciar implementación; anotaron casos de error de sesión para resolver durante T12/T41.
-- [ ] **T03 (10 min)** Definir tipos y validaciones de mesa y ocupación
+- [x] **T03 (10 min)** ~~Definir tipos y validaciones de mesa y ocupación~~
   - Archivos: `packages/api/src/models/table.model.ts`, `table-session.model.ts` (nuevos), `errors/DomainErrors.ts`; tests nuevos junto a los modelos.
   - Dependencias: T01.
   - Comprobación: tests rechazan estados desconocidos, número/capacidad/grupo cero, negativos, fracciones, strings, null y campos ausentes donde sean obligatorios.
+  - Evidencia: rojo con `npx vitest run src/models` (exportaciones como stubs `not implemented`, para que el fallo no sea de importación): 57 tests fallidos por `expected error to be instance of Invalid…Error`/`got 'not implemented'`. Verde: 57/57 en `src/models`; `npm test` 12 archivos / 123 tests en verde. Cubre estados desconocidos (mayúsculas, vacío, null), número/capacidad/grupo 0, negativos, fracciones, strings, null, NaN, ausentes; descripción vacía válida; defaults de creación; id/restaurantId ignorados. `tsc --noEmit` solo muestra los 12 errores previos de `src/scripts/seed.ts` (`Object is possibly 'undefined'`, anteriores a esta tarea; se tratan en T17).
 - [ ] **T04 (10 min)** Añadir esquema de mesas y sesiones con restricciones
   - Archivos: `packages/api/src/config/database.ts`, `config/database.test.ts` (nuevo).
   - Dependencias: T03.

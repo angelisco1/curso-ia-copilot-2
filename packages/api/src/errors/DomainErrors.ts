@@ -162,3 +162,39 @@ export class OrderNotFoundError extends AppError {
   }
 }
 
+
+export class InvalidTableStatusError extends AppError {
+    constructor(message?: string) {
+        super(message ?? 'Invalid table status')
+    }
+}
+
+export class InvalidTableNumberError extends AppError {
+    constructor() {
+        super('Table number must be a positive integer')
+    }
+}
+
+export class InvalidTableCapacityError extends AppError {
+    constructor() {
+        super('Table capacity must be a positive integer')
+    }
+}
+
+export class InvalidTableDescriptionError extends AppError {
+    constructor() {
+        super('Table description must be a string')
+    }
+}
+
+export class InvalidPartySizeError extends AppError {
+    constructor() {
+        super('Party size must be a positive integer')
+    }
+}
+
+export class InvalidTableIdError extends AppError {
+    constructor() {
+        super('Table ID is required')
+    }
+}
