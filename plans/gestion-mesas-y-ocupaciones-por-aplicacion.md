@@ -284,10 +284,11 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T37.
   - Comprobación: seleccionar no muta estado; continuar sin selección bloqueado; una petición mientras guarda; 201/200 guarda sesión y navega a carta, 409 muestra aviso y refresca/reconcilia sin elegir otra mesa automáticamente.
   - Evidencia: rojo: `confirm`/`saving` inexistentes (errores TS2339 en el spec). Verde: 53 tests; continuar bloqueado sin selección, 201/200 guardan sesión y navegan a `/restaurants/:id`, doble clic = una sola petición, 409 (formato nuevo y heredado) avisa sin navegar, reconcilia con `GET current` y refresca la lista sin elegir mesa; `ActiveTableSessionExistsError` muestra la sesión existente; fallo de red conserva la selección para reintentar.
-- [ ] **T39 (10 min)** Conectar listado, rutas y acceso directo a carta
+- [x] **T39 (10 min)** ~~Conectar listado, rutas y acceso directo a carta~~
   - Archivos: `packages/web-clientes/src/app/app.routes.ts`, `features/restaurants/restaurant-list.component.ts`, `core/guards/table-session.guard.ts` (nuevo), specs de rutas/guard.
   - Dependencias: T38.
   - Comprobación: restaurante lleva a `restaurants/:id/tables`; conservar carta en `restaurants/:id`; guard consulta sesión propia y redirige al paso de mesas si no existe, sin bucles. Con sesión existente volver al restaurante permite continuar a su carta sin ocupar de nuevo.
+  - Evidencia: rojo: specs de guard/rutas/listado no compilaban (guard inexistente). Verde: 61 tests; `tableSessionGuard` consulta siempre al servidor (true con sesión, `UrlTree` a `/restaurants/:id/tables` con `null` o error), `restaurants/:id/tables` carga `TableSelectionPage` sin guard (sin bucles), `restaurants/:id` conserva la carta con guard, el listado enlaza a `/restaurants/:id/tables`. Con sesión existente, la page de mesas ofrece continuar a la carta sin ocupar de nuevo (T38).
 - [ ] **T40 (10 min)** Vincular carrito y carta a la ocupación activa
   - Archivos: `packages/web-clientes/src/app/core/store/cart.store.ts`, `cart.store.spec.ts` (nuevo), `features/menu/restaurant-menu.component.ts`, `features/cart/cart.component.ts`.
   - Dependencias: T36, T39.
