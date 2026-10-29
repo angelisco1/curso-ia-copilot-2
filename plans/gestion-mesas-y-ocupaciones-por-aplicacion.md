@@ -264,10 +264,11 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: ninguna.
   - Comprobación: script `test` y target `@angular/build:unit-test` con Vitest; añadir únicamente dependencias de pruebas necesarias, compatibles con el paquete. Tras editar manifiesto ejecutar `npm install` desde raíz; smoke test rojo/verde ejecutable. El comando de tests de clientes pasa a existir en este paso.
   - Evidencia: rojo: `npm run test -w @resttek/web-clientes` con `smoke.spec.ts` falló por `Missing script: "test"`. Verde: añadidos script `test`, target `@angular/build:unit-test` (Vitest) y devDependencies `vitest`/`jsdom` con las mismas versiones que web-admin; `tsconfig.spec.json` ya existía con `vitest/globals`. Tras `npm install`, 1 test pasa.
-- [ ] **T35 (10 min)** Añadir tipos y servicio HTTP de disponibilidad/ocupación
+- [x] **T35 (10 min)** ~~Añadir tipos y servicio HTTP de disponibilidad/ocupación~~
   - Archivos: `packages/web-clientes/src/app/core/models/table.model.ts`, `services/table.service.ts`, `services/table.service.spec.ts` (nuevos).
   - Dependencias: T01, T34.
   - Comprobación: GET con grupo, POST solo al continuar, GET current con sesión o null, errores 409 propagados; nunca enviar clientId.
+  - Evidencia: contrato `tables.openapi.yaml` (propuesto, aún no implementado en la API; solo lectura, no incluido en commits frontend). Rojo: `table.service.spec.ts` no compilaba al no existir `TableService`. Verde: `npm run test -w @resttek/web-clientes` 9 tests; cubre GET con `partySize`, POST solo `{tableId, partySize}` (sin `clientId`), 201 y 200 idempotente, `current` con sesión, literal `null`/cuerpo sin sesión → `null`, 409 propagado con su cuerpo.
 - [ ] **T36 (10 min)** Mantener y recuperar contexto de ocupación desde servidor
   - Archivos: `packages/web-clientes/src/app/core/store/table-session.store.ts`, `table-session.store.spec.ts` (nuevos).
   - Dependencias: T35.
