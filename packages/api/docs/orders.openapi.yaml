@@ -1,0 +1,511 @@
+openapi: 3.0.3
+info:
+  title: API de pedidos de Resttek
+  version: 1.0.0
+  description: |
+    Contrato independiente de las rutas de pedidos (`/api/v1/orders`), tarea
+    21 (plan plans/gestion-mesas-y-ocupaciones-por-aplicacion.md, T02).
+    Las mesas y sesiones se documentan en
+    [tables.openapi.yaml](tables.openapi.yaml).
+
+    **Estado.** Lo marcado como *existente* describe el comportamiento actual
+    de la API tal como esta implementado. Lo marcado como **PENDIENTE DE
+    IMPLEMENTAR** (campos `tableSessionId`, `tableNumber`,
+    `tableSessionEndedAt`, validacion de sesion del cliente y los errores
+    nuevos) es una propuesta no desplegada hasta verificarla con pruebas HTTP.
+
+    Comportamiento existente que se conserva: todas las rutas requieren JWT y
+    solo se comprueba autenticacion (no el rol); `restaurantId` y `tableId` se
+    toman del cuerpo; cada unidad pedida genera un `OrderItem` con
+    `quantity: 1` y estado `pendiente` (un `quantity: 3` produce 3 items);
+    `GET /active` devuelve pedidos con al menos un item no `entregado`; no
+    existe un estado global de pedido, solo estados por item (`pendiente`,
+    `preparando`, `listo`, `entregado`). Los errores de estas rutas son
+    `{error: <mensaje>}` sin `message`, y los errores desconocidos son
+    `{error: 'Internal Server Error'}`.
+
+    **Compatibilidad historica.** Los pedidos anteriores no tienen sesion:
+    `tableSessionId`, `tableNumber` y `tableSessionEndedAt` son `null`. Siguen
+    siendo consultables y procesables; no se asocian por numero de mesa ni se
+    atribuyen a una visita nueva. Un pedido de una sesion cerrada conserva su
+    `tableSessionId` y expone `tableSessionEndedAt` para etiquetarlo como
+    ocupacion anterior; sigue activo en cocina, barra y entregas hasta que se
+    entreguen sus items.
+servers:
+  - url: http://localhost:3000
+    description: API local; los paths incluyen el prefijo /api/v1.
+tags:
+  - name: Pedidos
+    description: Creacion, consulta y avance de items de pedidos.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/orders:
+    post:
+      tags: [Pedidos]
+      operationId: crearPedido
+      summary: Crear un pedido
+      description: |
+        Existente: crea el pedido con `clientId` tomado del JWT (`user.id`) y
+        responde 201 con el pedido. No se valida el rol ni que los platos
+        existan en este nivel.
+
+        **PENDIENTE DE IMPLEMENTAR (T12/T14):** si el actor es `cliente`,
+        `tableSessionId` es obligatorio y debe ser una sesion abierta del
+        propio cliente; `restaurantId` y, si se envia, `tableId` deben
+        coincidir con los de esa sesion (el servidor fija `tableId`, y
+        `tableNumber` de presentacion, a partir de la sesion). Un cliente no
+        puede crear pedidos sin sesion propia activa ni falsificar
+        restaurante, mesa o una sesion ajena o cerrada. Para actores no cliente
+        se conservan las llamadas existentes: `tableSessionId` es opcional y no
+        se les impone una sesion de cliente. La respuesta de exito no cambia de
+        forma, salvo los tres campos nuevos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearPedido'
+            examples:
+              clienteConSesion:
+                summary: PENDIENTE - cliente con su sesion activa
+                value:
+                  restaurantId: rest-1
+                  tableId: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
+                  tableSessionId: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1
+                  items:
+                    - {dishId: dish-1, quantity: 2, notes: Sin cebolla}
+                    - {dishId: dish-2, quantity: 1, notes: null}
+              sinSesionHistorico:
+                summary: Existente - llamada sin sesion (no cliente / compatibilidad)
+                value:
+                  restaurantId: rest-1
+                  tableId: null
+                  items:
+                    - {dishId: dish-1, quantity: 1, notes: null}
+      responses:
+        '201':
+          description: |
+            Pedido creado con un item por unidad. Los items de la respuesta de
+            creacion no incluyen `dishName`, `dishPrice` ni `dishCategory`, y el
+            pedido no incluye `restaurantName` ni `restaurantLogoUrl`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              examples:
+                conSesion:
+                  summary: PENDIENTE - pedido de cliente con mesa
+                  value:
+                    id: 0f6c2e5a-3b4d-4e6f-8a7b-dddddddddddd
+                    restaurantId: rest-1
+                    tableId: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
+                    clientId: 9a8b7c6d-0000-4000-8000-cccccccccccc
+                    createdAt: '2026-10-29T18:05:00.000Z'
+                    tableSessionId: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1
+                    tableNumber: 1
+                    tableSessionEndedAt: null
+                    items:
+                      - {id: 11111111-1111-4111-8111-111111111111, dishId: dish-1, quantity: 1, notes: Sin cebolla, status: pendiente}
+                      - {id: 22222222-2222-4222-8222-222222222222, dishId: dish-1, quantity: 1, notes: Sin cebolla, status: pendiente}
+                      - {id: 33333333-3333-4333-8333-333333333333, dishId: dish-2, quantity: 1, notes: null, status: pendiente}
+                sinSesion:
+                  summary: Existente - sin sesion
+                  value:
+                    id: 0f6c2e5a-3b4d-4e6f-8a7b-eeeeeeeeeeee
+                    restaurantId: rest-1
+                    tableId: null
+                    clientId: null
+                    createdAt: '2026-10-29T18:06:00.000Z'
+                    tableSessionId: null
+                    tableNumber: null
+                    tableSessionEndedAt: null
+                    items:
+                      - {id: 44444444-4444-4444-8444-444444444444, dishId: dish-1, quantity: 1, notes: null, status: pendiente}
+        '400':
+          description: |
+            Existente: cualquier `Error` del servicio se devuelve con 400 y
+            `{error: <mensaje>}`, p. ej. `RestaurantIdRequiredError` (mensaje
+            `Restaurant ID is required`). PENDIENTE: la falta de
+            `tableSessionId` o discordancia de restaurante/mesa en un cliente
+            se responde 400 con el formato `{error, message}` de los errores de
+            dominio nuevos (a confirmar, ver preguntas de revision).
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ErrorHeredado'
+                  - $ref: '#/components/schemas/ErrorAplicacion'
+              examples:
+                restauranteAusente:
+                  value: {error: Restaurant ID is required}
+                sesionRequerida:
+                  summary: PENDIENTE
+                  value: {error: TableSessionRequiredError, message: A table session is required to place an order}
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: |
+            PENDIENTE: sesion de otro cliente (titularidad ajena).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorAplicacion'
+              example: {error: TableSessionForbiddenError, message: The table session does not belong to the client}
+        '404':
+          description: PENDIENTE - `tableSessionId` inexistente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorAplicacion'
+              example: {error: TableSessionNotFoundError, message: Table session not found}
+        '409':
+          description: |
+            PENDIENTE - la sesion esta cerrada (liberada por un empleado o
+            mesa borrada), tambien si se cierra en una carrera concurrente.
+            No se crea el pedido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorAplicacion'
+              example: {error: TableSessionClosedError, message: The table session is closed}
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/orders/active:
+    get:
+      tags: [Pedidos]
+      operationId: listarPedidosActivos
+      summary: Pedidos activos de un restaurante (existente)
+      description: |
+        Existente. Pedidos con al menos un item no `entregado`, ordenados por
+        `createdAt` ascendente. Incluye pedidos historicos sin sesion y de
+        sesiones ya cerradas (con `tableSessionEndedAt` informado PENDIENTE de
+        implementar). No incluye `restaurantName` ni `restaurantLogoUrl`.
+        Para ver todos los pedidos, incluso entregados, de la visita actual de
+        una mesa usar `GET /restaurants/{restaurantId}/tables/{tableId}/orders`
+        en [tables.openapi.yaml](tables.openapi.yaml).
+      parameters:
+        - name: restaurantId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista de pedidos activos; puede estar vacia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+              examples:
+                conItemsExpandidosYCategorias:
+                  $ref: '#/components/examples/ActivosConCategorias'
+        '400':
+          description: Falta `restaurantId` o no es una cadena.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorHeredado'
+              example: {error: restaurantId is required}
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/orders/mine:
+    get:
+      tags: [Pedidos]
+      operationId: listarMisPedidos
+      summary: Pedidos del usuario autenticado (existente)
+      description: |
+        Existente. Pedidos cuyo `clientId` es el `id` del JWT, ordenados por
+        `createdAt` descendente, con `restaurantName` y `restaurantLogoUrl`.
+        Incluye historicos sin sesion y pedidos de sesiones cerradas.
+      responses:
+        '200':
+          description: Pedidos propios; puede estar vacia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/orders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Identificador del pedido.
+        schema:
+          type: string
+    get:
+      tags: [Pedidos]
+      operationId: obtenerPedido
+      summary: Obtener un pedido por id (existente)
+      description: |
+        Existente. Cualquier usuario autenticado; no se comprueba titularidad
+        ni restaurante. Incluye `restaurantName` y `restaurantLogoUrl`.
+      responses:
+        '200':
+          description: Pedido encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          description: Pedido inexistente (`OrderNotFoundError`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorHeredado'
+              example: {error: Order not found}
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/orders/{orderId}/items/{itemId}/status:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: itemId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      tags: [Pedidos]
+      operationId: cambiarEstadoItem
+      summary: Cambiar el estado de un item (existente, sin cambios)
+      description: |
+        Existente. Cualquier usuario autenticado. Funciona igual para pedidos
+        historicos y de sesiones cerradas: liberar o borrar una mesa no
+        entrega ni cancela items. El valor se normaliza a minusculas sin
+        espacios.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  $ref: '#/components/schemas/EstadoItem'
+            example: {status: preparando}
+      responses:
+        '204':
+          description: Estado actualizado; sin cuerpo.
+        '400':
+          description: |
+            Pedido o item inexistente (`Order not found`, con 400 y no 404) o
+            estado invalido (`InvalidOrderStatusError`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorHeredado'
+              examples:
+                noEncontrado:
+                  value: {error: Order not found}
+                estado:
+                  value: {error: 'Estado inválido: x. Debe ser uno de: pendiente, preparando, listo, entregado'}
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    EstadoItem:
+      type: string
+      enum: [pendiente, preparando, listo, entregado]
+    CategoriaPlato:
+      type: string
+      enum: [entrante, principal, postre, bebida]
+    CrearPedido:
+      type: object
+      required: [restaurantId, items]
+      properties:
+        restaurantId:
+          type: string
+        tableId:
+          type: string
+          nullable: true
+          description: |
+            Existente: texto libre opcional. PENDIENTE: en clientes debe
+            coincidir con la mesa de la sesion; el servidor la fija desde ella.
+        tableSessionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            PENDIENTE. Obligatorio para el rol `cliente`; opcional para los
+            demas actores y para llamadas existentes.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CrearItem'
+    CrearItem:
+      type: object
+      required: [dishId, quantity]
+      properties:
+        dishId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          description: Se expande en `quantity` items de cantidad 1.
+        notes:
+          type: string
+          nullable: true
+    OrderItem:
+      type: object
+      required: [id, dishId, quantity, notes, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        dishId:
+          type: string
+        quantity:
+          type: integer
+          description: Siempre 1 en pedidos nuevos (expansion por unidad).
+        notes:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/EstadoItem'
+        dishName:
+          type: string
+          nullable: true
+          description: Presente en lecturas (puede ser null si el plato no existe); ausente al crear.
+        dishPrice:
+          type: number
+          nullable: true
+          description: Presente en lecturas; ausente al crear.
+        dishCategory:
+          type: string
+          enum: [entrante, principal, postre, bebida]
+          nullable: true
+          description: Presente en lecturas; ausente al crear.
+    Order:
+      type: object
+      required: [id, restaurantId, tableId, clientId, createdAt, items]
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+        tableId:
+          type: string
+          nullable: true
+          description: Se conserva sin cambios por compatibilidad.
+        clientId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        restaurantName:
+          type: string
+          nullable: true
+          description: Solo en `GET /mine` y `GET /{id}`.
+        restaurantLogoUrl:
+          type: string
+          nullable: true
+          description: Solo en `GET /mine` y `GET /{id}`.
+        tableSessionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            PENDIENTE. Null en pedidos historicos o sin sesion. Cuando existen
+            los campos nuevos, se devuelven siempre (con null si no aplican).
+        tableNumber:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: PENDIENTE. Numero de mesa de presentacion; null si no hay mesa conocida.
+        tableSessionEndedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            PENDIENTE. Fecha de cierre de la sesion; no null indica
+            ocupacion anterior. Null si la sesion sigue abierta o no hay sesion.
+    ErrorHeredado:
+      type: object
+      required: [error]
+      description: Formato existente de los errores de pedidos, el mensaje va en `error`.
+      properties:
+        error:
+          type: string
+    ErrorAplicacion:
+      type: object
+      required: [error, message]
+      description: Formato de errores de dominio nuevos (PENDIENTE).
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+  examples:
+    ActivosConCategorias:
+      summary: Pedido activo con items expandidos y categorias, y uno historico sin sesion
+      value:
+        - id: 0f6c2e5a-3b4d-4e6f-8a7b-dddddddddddd
+          restaurantId: rest-1
+          tableId: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
+          clientId: 9a8b7c6d-0000-4000-8000-cccccccccccc
+          createdAt: '2026-10-29T18:05:00.000Z'
+          tableSessionId: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1
+          tableNumber: 1
+          tableSessionEndedAt: '2026-10-29T19:00:00.000Z'
+          items:
+            - {id: 11111111-1111-4111-8111-111111111111, dishId: dish-1, quantity: 1, notes: null, status: preparando, dishName: Ensalada, dishPrice: 8.5, dishCategory: entrante}
+            - {id: 33333333-3333-4333-8333-333333333333, dishId: dish-2, quantity: 1, notes: null, status: listo, dishName: Cerveza, dishPrice: 3, dishCategory: bebida}
+        - id: 0f6c2e5a-3b4d-4e6f-8a7b-eeeeeeeeeeee
+          restaurantId: rest-1
+          tableId: '5'
+          clientId: null
+          createdAt: '2026-10-28T20:00:00.000Z'
+          tableSessionId: null
+          tableNumber: null
+          tableSessionEndedAt: null
+          items:
+            - {id: 44444444-4444-4444-8444-444444444444, dishId: dish-3, quantity: 1, notes: null, status: pendiente, dishName: Tarta, dishPrice: 5, dishCategory: postre}
+  responses:
+    NoAutenticado:
+      description: JWT ausente, mal formado, invalido o caducado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorHeredado'
+          examples:
+            ausente:
+              value: {error: 'Unauthorized: No token provided'}
+            invalido:
+              value: {error: 'Unauthorized: Invalid token'}
+    ErrorInterno:
+      description: Error inesperado; se oculta el detalle original.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorHeredado'
+          example: {error: Internal Server Error}

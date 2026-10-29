@@ -115,10 +115,11 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
   - Dependencias: ninguna.
   - Comprobación: contrato con ejemplos de tres estados, capacidad, sesión actual, reintento, borrado lógico y errores; confrontar cada fila de la superficie HTTP con un path.
   - Evidencia: tarea documental, no aplica rojo/verde. `npx --yes @apidevtools/swagger-cli validate packages/api/docs/tables.openapi.yaml` válido; `npx --yes @redocly/cli@latest lint --extends minimal packages/api/docs/tables.openapi.yaml` sin errores (avisos de `servers: localhost` y esquema `CategoriaPlato` no referenciado en el contrato de pedidos). Revisado por agentes admin, empleados y clientes: los tres aprobaron; observaciones no bloqueantes registradas para implementación.
-- [ ] **T02 (5 min)** Documentar la ampliación de pedidos y compatibilidad histórica
+- [x] **T02 (5 min)** ~~Documentar la ampliación de pedidos y compatibilidad histórica~~
   - Archivos: `packages/api/docs/orders.openapi.yaml` (nuevo).
   - Dependencias: T01.
   - Comprobación: ejemplos con/sin sesión histórica, petición de cliente con sesión propia y respuesta con mesa; conservar expansión por unidad y categorías.
+  - Evidencia: tarea documental, no aplica rojo/verde. `npx --yes @apidevtools/swagger-cli validate packages/api/docs/orders.openapi.yaml` válido; `npx --yes @redocly/cli@latest lint --extends minimal packages/api/docs/orders.openapi.yaml` sin errores, con avisos no bloqueantes de `servers: localhost` y esquema `CategoriaPlato` sin referencia. Los agentes admin, empleados y clientes revisaron el contrato completo y aprobaron iniciar implementación; anotaron casos de error de sesión para resolver durante T12/T41.
 - [ ] **T03 (10 min)** Definir tipos y validaciones de mesa y ocupación
   - Archivos: `packages/api/src/models/table.model.ts`, `table-session.model.ts` (nuevos), `errors/DomainErrors.ts`; tests nuevos junto a los modelos.
   - Dependencias: T01.
