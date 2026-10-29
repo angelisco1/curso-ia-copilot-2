@@ -309,11 +309,13 @@ Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/co
   - Dependencias: T42.
   - Comprobación: escenarios de capacidad exacta/sobrante, 0/decimal, ausencia de mesas, dos clientes compitiendo, doble clic y segunda visita sin carrito de la primera.
   - Evidencia: tarea de cobertura: no hay rojo porque T36–T42 ya implementaban el comportamiento; se añadieron tests que pasan desde el inicio (112 tests en total). Nuevo `features/tables/table-visit-flow.spec.ts`: capacidad exacta, capacidad sobrante, ausencia de mesas (sin continuar) y segunda visita sin carrito de la primera. Ya cubiertos en specs previos: grupo `''`/`0`/`-1`/`2.5`/`abc`/`1e2` (page), dos clientes compitiendo = 409 mesa no disponible o sesión activa (T38), doble clic = una llamada.
-- [ ] **T44 (5 min)** Validar clientes con el backend integrado
+- [x] **T44 (5 min)** ~~Validar clientes con el backend integrado~~
   - Archivos: este plan.
   - Dependencias: T17, T43.
   - Comprobación: `npm run test -w @resttek/web-clientes` (disponible tras T34), `npm run build -w @resttek/web-clientes`; navegador con recarga y retorno desde otro restaurante confirma recuperación sin liberación automática.
-  - Evidencia parcial (T44 NO completada): `npm run test -w @resttek/web-clientes` 112/112 en 15 ficheros y `npm run build -w @resttek/web-clientes` correcto. PENDIENTE: validación con backend integrado y navegador (recarga y retorno desde otro restaurante), no realizada porque depende de T17 y de la implementación de los contratos en la API, que aún no están en esta rama. Tampoco se ha verificado manualmente `visibilitychange` real ni el formato final de los errores 400/403/404/409 de sesión.
+  - Evidencia: `npm run test -w @resttek/web-clientes` 113/113 en 15 ficheros y `npm run build -w @resttek/web-clientes` correcto. Desajuste hallado y corregido con TDD (rojo: caso `TableSessionMismatchError` no navegaba): el 400 `TableSessionMismatchError` de `POST /orders` (sesión incoherente con restaurante/mesa) se trataba como error genérico; ahora se trata como sesión no válida (aviso, `clear` + `reset`, vuelta a selección). Servicio, store, guard y paths/cuerpos coinciden con `tables.openapi.yaml` y `orders.openapi.yaml` de `21/gestion-mesas` (disponibilidad `GET .../tables/available?partySize=`, `POST .../table-sessions` `{tableId, partySize}`, `GET .../table-sessions/current` con literal `null`).
+  - Validación con API real SIN NAVEGADOR: API de `21/gestion-mesas` (commit 9cc7205) en un worktree desacoplado temporal, BD propia con `npm run seed`, puerto 3013 (worktree y proceso retirados al acabar). Se reprodujo con un script Python (urllib) la secuencia de peticiones que hace el cliente, con JWT reales de cliente1/cliente2/camarero1: current inicial 200 `null`; disponibilidad grupo 2 (200, sin ocupar al repetir; `0`, `2.5`, `abc` -> 400 `InvalidPartySizeError`); ocupar 201; reintento mismo cliente/mesa/grupo 200 con la misma sesión; otro cliente misma mesa 409 `TableNotAvailableError`; mismo cliente otra mesa 409 `ActiveTableSessionExistsError`; "recarga" (current devuelve la sesión); la mesa deja de listarse; current en otro restaurante `null` y al volver a R1 la misma sesión sin liberar; cliente2 no ve la sesión ajena (`null`); pedido con sesión 201; sin sesión 400 `TableSessionRequiredError`; sesión ajena 403 `TableSessionForbiddenError`; inexistente 404 `TableSessionNotFoundError`; restaurante o mesa incoherentes 400 `TableSessionMismatchError`; camarero libera -> pedido 409 `TableSessionClosedError`, current `null`, el pedido previo sigue en `/orders/mine` con `tableNumber` y `tableSessionEndedAt`; nueva visita en la misma mesa 201 con sesión distinta. Todos con cuerpo `{error, message}` coincidente con el parseo del cliente.
+  - NO verificado: navegador real (recarga, retorno desde otro restaurante, `visibilitychange` real); solo cubierto por specs jsdom y por las peticiones HTTP reproducidas. Nota de diseño: ante errores de sesión el carrito se vacía (`reset`) para no reenviarlo a otra mesa (T41/CA15); el 400 heredado `Restaurant ID is required` y los fallos de red/500 conservan los productos.
 
 ### E. Integración y documentación — agente coordinador
 
@@ -355,15 +357,18 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Verificación: prueba de repositorio/API con esas fixtures y selección de cliente en navegador; grupo sin coincidencias muestra vacío explícito.
   - Evidencia: pendiente.
 - [ ] **CA04 — Momento de ocupación.** Indicar grupo/listar/seleccionar no ocupa; continuar con éxito abre una sesión, marca ocupada y lleva a carta.
+  - Evidencia parcial (solo parte clientes, NO marcado): listar/seleccionar no ocupa (API real: disponibilidad repetida no cambia estado; specs: seleccionar no llama a ocupar); continuar abre sesión 201 y navega a la carta (spec). Sin navegador.
   - Verificación: consultar mesa antes y después; test HTTP y componente con spy del POST; continuar inválido no llama API.
   - Evidencia: pendiente.
 - [ ] **CA05 — Conflicto concurrente y reintento.** Dos clientes no consiguen ocupar la misma mesa; reintentar el ganador no duplica sesión y un fallo no deja estado parcial.
   - Verificación: dos peticiones concurrentes, una creación y un conflicto; contar una sesión abierta, repetir confirmación y comprobar mismo id; inyectar fallo y comprobar rollback.
   - Evidencia: pendiente.
 - [ ] **CA06 — Recuperación sin liberación automática.** Recargar, salir o cambiar restaurante conserva sesión en servidor y al volver se recupera la mesa.
+  - Evidencia parcial (solo parte clientes, NO marcado): API real: current devuelve la misma sesión tras "recarga" y tras consultar otro restaurante y volver, sin liberación; el guard/store reconsultan al servidor (specs). Sin navegador.
   - Verificación: navegador con recarga completa y vuelta desde otro restaurante; GET current devuelve misma sesión; ninguna petición de liberación desde cliente.
   - Evidencia: pendiente.
 - [ ] **CA07 — Acceso directo y contexto obsoleto.** No se puede pedir sin sesión propia abierta ni usar sesión cerrada, borrada, ajena o de otro restaurante.
+  - Evidencia parcial (solo parte clientes, NO marcado): API real: pedido sin sesión 400, ajena 403, inexistente 404, incoherente 400, cerrada 409 y el cliente vuelve a selección sin reenviar (specs). Sin navegador; faltan sesión borrada y de otro restaurante en caso de borrado de mesa (admin).
   - Verificación: URL directa a carta sin sesión redirige; POST manipulado devuelve error; liberar desde empleados y volver a cliente impide pedido; cubrir carrera entre cierre y creación.
   - Evidencia: pendiente.
 - [ ] **CA08 — Envío a cocina y barra.** Nuevo pedido guarda mesa/sesión correctas; comida aparece en cocina y bebida en barra, conservando estados por unidad.
@@ -388,9 +393,11 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Verificación: fixture del esquema previo, evolución y segunda inicialización; comparar ids/ítems antes/después; pruebas de listados antiguos y panel de entregas.
   - Evidencia: pendiente.
 - [ ] **CA15 — Carrito y usuario aislados.** Carrito de otra visita/restaurante no se envía en la nueva; enviar un pedido no pierde la ocupación; otro usuario no hereda sesión local.
+  - Evidencia parcial (solo parte clientes, NO marcado): specs: carrito ligado a restaurante+sesión, nueva visita sin productos previos, enviar pedido conserva la ocupación, logout/otro usuario vacía contexto. Sin navegador.
   - Verificación: tests de store y recorrido cambiar restaurante/visita, confirmar y pedir de nuevo; logout/login con usuario distinto.
   - Evidencia: pendiente.
 - [ ] **CA16 — Errores y refresco fiables.** Carga/error/vacío tienen presentación explícita; fallos no simulan éxito; las respuestas tardías no cruzan restaurante, grupo ni visita.
+  - Evidencia parcial (solo parte clientes, NO marcado): specs: carga/vacío/error con reintento y descarte de respuestas tardías por grupo y restaurante; errores no simulan éxito. Sin navegador.
   - Verificación: tests con respuestas HTTP invertidas, 409 y fallo de red en cada app; timers de empleados se detienen al salir y no se duplican al volver.
   - Evidencia: pendiente.
 - [ ] **CA17 — Capacidad y cambios administrativos coherentes.** No se reduce capacidad por debajo del grupo activo; PUT, PATCH y borrado mantienen el ciclo de sesiones.
