@@ -1,0 +1,782 @@
+openapi: 3.0.3
+info:
+  title: API de mesas y ocupaciones de Resttek
+  version: 1.0.0
+  description: |
+    Contrato independiente de mesas, sesiones de ocupacion y pedidos de la
+    visita actual. Pertenece a la tarea 21 (plan
+    plans/gestion-mesas-y-ocupaciones-por-aplicacion.md, tareas T01 y T02).
+
+    **Estado: PROPUESTO Y PENDIENTE DE IMPLEMENTAR.** Ninguna operacion de este
+    documento existe todavia en la API; describe el comportamiento objetivo y
+    no debe presentarse como desplegado hasta verificarlo con pruebas HTTP.
+    Los consumidores (admin, empleados, clientes) deben revisarlo antes de
+    empezar la implementacion frontend. Los pedidos se documentan en
+    [orders.openapi.yaml](orders.openapi.yaml).
+
+    Reglas del dominio:
+    - Estados de mesa: `libre`, `ocupada`, `reservada`. `reservada` es solo un
+      estado manual; no hay reservas con fecha ni datos de contacto.
+    - `number` y `capacity` son enteros positivos (sin limite maximo);
+      `description` es texto y admite cadena vacia. Los IDs son UUID generados
+      en el servidor.
+    - `number` es unico entre las mesas no eliminadas del mismo restaurante; se
+      puede repetir entre restaurantes y reutilizar tras un borrado logico. El
+      id de una mesa borrada no se reutiliza.
+    - Una mesa tiene como maximo una sesion abierta; un cliente tiene como
+      maximo una sesion abierta por restaurante, pero puede conservar sesiones
+      en restaurantes distintos. Salir, recargar o cambiar de restaurante no
+      libera la mesa: solo la libera un empleado (o el borrado de la mesa).
+    - Solo una mesa `libre` con `capacity >= partySize` es elegible por un
+      cliente. Listar disponibilidad no cambia el estado; la ocupacion se
+      confirma en servidor y abre la sesion de forma atomica.
+    - Transiciones: `ocupada -> libre|reservada` cierra la sesion (`endedAt`);
+      `libre|reservada -> ocupada` manual abre una sesion sin cliente
+      (`clientId` y `partySize` nulos); repetir `ocupada -> ocupada` no crea
+      otra visita ni cambia al titular. Liberar no entrega ni cancela pedidos.
+    - Borrar una mesa es logico (`deletedAt`, no expuesto), cierra su sesion
+      aunque estuviera ocupada y conserva sesiones, pedidos e items. Una mesa
+      borrada responde 404 y no aparece en listados ni en disponibilidad.
+    - No se puede cambiar una mesa de restaurante. No se puede reducir
+      `capacity` por debajo de `partySize` de la sesion de cliente activa.
+    - Permisos por `role` del JWT; manager y camarero solo operan en su propio
+      restaurante (claim `restaurantId`), admin en cualquiera, cocinero no
+      accede a estas operaciones. No se expone la identidad de ningun cliente
+      en disponibilidad ni en listados de mesas.
+
+    Errores: los nuevos errores de dominio usan `{error, message}` (nombre de
+    la clase y mensaje en ingles) con el mapeo 400, 403, 404 y 409. Los errores
+    de middleware (JWT, rol) usan `{error}` sin `message`. Los fallos
+    inesperados responden 500 y nunca se ocultan como exito o lista vacia.
+servers:
+  - url: http://localhost:3000
+    description: API local; los paths incluyen el prefijo /api/v1.
+tags:
+  - name: Mesas
+    description: CRUD, estado y consulta de mesas de un restaurante.
+  - name: Ocupaciones
+    description: Disponibilidad, confirmacion y recuperacion de la ocupacion del cliente.
+  - name: Pedidos de mesa
+    description: Pedidos de la visita actual de una mesa.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/restaurants/{restaurantId}/tables:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    post:
+      tags: [Mesas]
+      operationId: crearMesa
+      summary: Crear una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Solo admin. `restaurantId` sale de la ruta y debe existir. `status`
+        es opcional y por defecto `libre`; si se crea `ocupada` se abre una
+        sesion manual sin cliente. `description` omitida equivale a cadena vacia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearMesa'
+            examples:
+              libre:
+                value: {number: 1, description: Terraza junto a la ventana, capacity: 4}
+              reservada:
+                value: {number: 2, description: '', capacity: 6, status: reservada}
+      responses:
+        '201':
+          description: Mesa creada, sin envoltorio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mesa'
+              examples:
+                libre:
+                  $ref: '#/components/examples/MesaLibre'
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+    get:
+      tags: [Mesas]
+      operationId: listarMesas
+      summary: Listar las mesas no eliminadas de un restaurante (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Roles: admin, manager y camarero (manager y camarero solo de su
+        restaurante). Devuelve las mesas en cualquiera de los tres estados,
+        ordenadas por `number` ascendente, sin paginacion y sin las borradas.
+        `activeSessionId` permite al consumidor invalidar el detalle cuando
+        cambia la visita; no revela al cliente. Un restaurante sin mesas
+        devuelve `[]`; un restaurante inexistente devuelve 404.
+      responses:
+        '200':
+          description: Lista de mesas sin envoltorio; puede estar vacia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mesa'
+              examples:
+                vacia:
+                  value: []
+                tresEstados:
+                  $ref: '#/components/examples/ListaTresEstados'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/tables/available:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [Ocupaciones]
+      operationId: listarMesasDisponibles
+      summary: Consultar mesas libres con capacidad suficiente (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Solo cliente. Devuelve las mesas `libre` no eliminadas con
+        `capacity >= partySize`, ordenadas por `capacity` y despues `number`
+        ascendentes. No cambia ningun estado ni reserva la mesa. La ruta se
+        registra antes de `/{tableId}` y `available` nunca se interpreta como
+        id. Una consulta valida sin resultados devuelve `[]`.
+      parameters:
+        - name: partySize
+          in: query
+          required: true
+          description: Numero de personas; entero positivo.
+          schema:
+            type: integer
+            minimum: 1
+          example: 3
+      responses:
+        '200':
+          description: Mesas elegibles, sin estado, sesion ni datos de clientes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MesaDisponible'
+              examples:
+                resultados:
+                  value:
+                    - {id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1, number: 1, description: Terraza, capacity: 4}
+                    - {id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa3, number: 3, description: Salon, capacity: 6}
+                sinResultados:
+                  value: []
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/tables/{tableId}:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - $ref: '#/components/parameters/TableId'
+    get:
+      tags: [Mesas]
+      operationId: obtenerMesa
+      summary: Obtener una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Roles: admin, manager y camarero (manager y camarero solo de su
+        restaurante). Una mesa borrada o de otro restaurante distinto al de la
+        ruta responde 404.
+      responses:
+        '200':
+          description: Mesa encontrada, sin envoltorio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mesa'
+              examples:
+                ocupada:
+                  $ref: '#/components/examples/MesaOcupada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+    put:
+      tags: [Mesas]
+      operationId: actualizarMesa
+      summary: Sustituir los datos de una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Solo admin. No es un parche: requiere `number`, `description`,
+        `capacity` y `status`. `id` y `restaurantId` son inmutables y se
+        ignoran si llegan en el cuerpo. El cambio de `status` aplica las mismas
+        transiciones que `PATCH .../status`. Conflictos: numero duplicado entre
+        mesas no eliminadas del restaurante y `capacity` menor que el
+        `partySize` de la sesion de cliente activa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SustituirMesa'
+            example: {number: 1, description: Terraza, capacity: 6, status: libre}
+      responses:
+        '200':
+          description: Mesa actualizada, sin envoltorio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mesa'
+              examples:
+                libre:
+                  $ref: '#/components/examples/MesaLibre'
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+    delete:
+      tags: [Mesas]
+      operationId: borrarMesa
+      summary: Borrar logicamente una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Solo admin. Marca `deletedAt`, cierra la sesion abierta (incluso con
+        la mesa ocupada y pedidos pendientes) y conserva sesiones, pedidos e
+        items. Los pedidos pendientes siguen en cocina, barra y entregas. Borrar
+        una mesa ya borrada responde 404. Admin debe mostrar una advertencia de
+        confirmacion antes de llamar.
+      responses:
+        '204':
+          description: Mesa borrada logicamente; sin cuerpo.
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/tables/{tableId}/status:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - $ref: '#/components/parameters/TableId'
+    patch:
+      tags: [Mesas]
+      operationId: cambiarEstadoMesa
+      summary: Cambiar el estado de una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Roles: admin, manager y camarero (manager y camarero solo de su
+        restaurante). Aplica las transiciones descritas en la cabecera:
+        `ocupada -> libre|reservada` cierra la sesion sin tocar pedidos;
+        `libre|reservada -> ocupada` abre una sesion manual sin cliente;
+        repetir el estado actual es idempotente y responde 200 con la misma
+        mesa, sin crear otra sesion. No adopta ni reemplaza al titular de una
+        sesion de cliente existente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambiarEstado'
+            examples:
+              liberar: {value: {status: libre}}
+              ocupar: {value: {status: ocupada}}
+              reservar: {value: {status: reservada}}
+      responses:
+        '200':
+          description: Mesa con su estado y `activeSessionId` actualizados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mesa'
+              examples:
+                reservada:
+                  $ref: '#/components/examples/MesaReservada'
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/tables/{tableId}/orders:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - $ref: '#/components/parameters/TableId'
+    get:
+      tags: [Pedidos de mesa]
+      operationId: listarPedidosDeMesaActual
+      summary: Pedidos de la sesion abierta de una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Roles: admin, manager y camarero (manager y camarero solo de su
+        restaurante). Devuelve unicamente los pedidos de la sesion abierta, con
+        todos sus items, incluidos los `entregado`, ordenados por `createdAt`
+        ascendente. Una mesa existente sin sesion abierta devuelve `[]`; nunca
+        incluye pedidos de visitas anteriores ni pedidos historicos sin sesion.
+        Una mesa inexistente, borrada o de otro restaurante devuelve 404.
+        Cada pedido tiene el esquema `Order` de
+        [orders.openapi.yaml](orders.openapi.yaml).
+      responses:
+        '200':
+          description: Pedidos de la visita actual; puede estar vacia.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: 'orders.openapi.yaml#/components/schemas/Order'
+              examples:
+                sinSesion:
+                  value: []
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/table-sessions:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    post:
+      tags: [Ocupaciones]
+      operationId: confirmarOcupacion
+      summary: Confirmar la ocupacion de una mesa (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Solo cliente; `clientId` sale del JWT y nunca del cuerpo. Revalida en
+        servidor restaurante, mesa no borrada, estado `libre` y
+        `capacity >= partySize`, y abre la sesion marcando la mesa `ocupada` de
+        forma atomica; si una carrera concurrente la gana otro cliente, el
+        perdedor recibe 409 y no queda ninguna sesion huerfana.
+
+        **Idempotencia/reintento:** repetir la misma confirmacion del mismo
+        cliente para la misma mesa y el mismo `partySize` devuelve su sesion
+        activa con 200 sin duplicarla (la primera vez es 201). Si el cliente ya
+        tiene sesion activa en ese restaurante con otra mesa o grupo, responde
+        409 `ActiveTableSessionExistsError`; el consumidor recupera la
+        existente con `GET .../table-sessions/current`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmarOcupacion'
+            example: {tableId: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1, partySize: 3}
+      responses:
+        '201':
+          description: Ocupacion nueva creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcupacionActual'
+              examples:
+                nueva:
+                  $ref: '#/components/examples/OcupacionActual'
+        '200':
+          description: Reintento idempotente; devuelve la sesion activa existente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcupacionActual'
+              examples:
+                reintento:
+                  $ref: '#/components/examples/OcupacionActual'
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/ConflictoOcupacion'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/table-sessions/current:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [Ocupaciones]
+      operationId: recuperarOcupacionActual
+      summary: Recuperar la ocupacion propia en un restaurante (PENDIENTE DE IMPLEMENTAR)
+      description: |
+        Solo cliente. Devuelve la sesion abierta del cliente del JWT en ese
+        restaurante junto a su mesa, o el literal JSON `null` con 200 si no
+        existe (no es un 404). Nunca devuelve sesiones de otros clientes.
+        Permite recuperar la ocupacion tras recargar, volver o recibir un 409.
+      responses:
+        '200':
+          description: Ocupacion propia o `null`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcupacionActual'
+              examples:
+                existente:
+                  $ref: '#/components/examples/OcupacionActual'
+                inexistente:
+                  value: null
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT con claims `id`, `role` (admin, manager, camarero, cocinero,
+        cliente) y, para manager/camarero, `restaurantId`.
+  parameters:
+    RestaurantId:
+      name: restaurantId
+      in: path
+      required: true
+      description: Identificador del restaurante.
+      schema:
+        type: string
+    TableId:
+      name: tableId
+      in: path
+      required: true
+      description: UUID de la mesa. El literal `available` no es un id.
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    EstadoMesa:
+      type: string
+      enum: [libre, ocupada, reservada]
+    Mesa:
+      type: object
+      required: [id, restaurantId, number, description, capacity, status, activeSessionId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+        number:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+          description: Admite cadena vacia.
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/EstadoMesa'
+        activeSessionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            Sesion abierta o null. Solo lectura; cambia en cada nueva visita.
+            No revela la identidad del cliente.
+    CrearMesa:
+      type: object
+      required: [number, capacity]
+      additionalProperties: false
+      properties:
+        number:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+          default: ''
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          allOf:
+            - $ref: '#/components/schemas/EstadoMesa'
+          default: libre
+    SustituirMesa:
+      type: object
+      required: [number, description, capacity, status]
+      properties:
+        number:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/EstadoMesa'
+    CambiarEstado:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/EstadoMesa'
+    MesaDisponible:
+      type: object
+      description: Vista publica para clientes; sin estado, sesion ni datos personales.
+      required: [id, number, description, capacity]
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        capacity:
+          type: integer
+          minimum: 1
+    ConfirmarOcupacion:
+      type: object
+      required: [tableId, partySize]
+      properties:
+        tableId:
+          type: string
+          format: uuid
+        partySize:
+          type: integer
+          minimum: 1
+    SesionMesa:
+      type: object
+      description: Sesion de ocupacion abierta; `endedAt` es null mientras dure.
+      required: [id, restaurantId, tableId, clientId, partySize, startedAt, endedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+        tableId:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          nullable: true
+          description: Null en ocupacion manual. En esta API solo se devuelve al propio cliente.
+        partySize:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Null solo en ocupacion manual.
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+    OcupacionActual:
+      type: object
+      nullable: true
+      required: [session, table]
+      properties:
+        session:
+          $ref: '#/components/schemas/SesionMesa'
+        table:
+          $ref: '#/components/schemas/Mesa'
+    ErrorAplicacion:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Nombre de la clase de error o InternalServerError.
+        message:
+          type: string
+          description: Mensaje literal de la implementacion, en ingles.
+    ErrorAcceso:
+      type: object
+      required: [error]
+      description: Los errores de middleware no contienen message.
+      properties:
+        error:
+          type: string
+  examples:
+    MesaLibre:
+      summary: Mesa libre
+      value:
+        id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
+        restaurantId: rest-1
+        number: 1
+        description: Terraza junto a la ventana
+        capacity: 4
+        status: libre
+        activeSessionId: null
+    MesaOcupada:
+      summary: Mesa ocupada con sesion abierta
+      value:
+        id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa2
+        restaurantId: rest-1
+        number: 2
+        description: Barra
+        capacity: 2
+        status: ocupada
+        activeSessionId: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1
+    MesaReservada:
+      summary: Mesa reservada manualmente
+      value:
+        id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa3
+        restaurantId: rest-1
+        number: 3
+        description: ''
+        capacity: 6
+        status: reservada
+        activeSessionId: null
+    ListaTresEstados:
+      summary: Una mesa por estado
+      value:
+        - {id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1, restaurantId: rest-1, number: 1, description: Terraza, capacity: 4, status: libre, activeSessionId: null}
+        - {id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa2, restaurantId: rest-1, number: 2, description: Barra, capacity: 2, status: ocupada, activeSessionId: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1}
+        - {id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa3, restaurantId: rest-1, number: 3, description: '', capacity: 6, status: reservada, activeSessionId: null}
+    OcupacionActual:
+      summary: Sesion de cliente abierta y su mesa
+      value:
+        session:
+          id: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1
+          restaurantId: rest-1
+          tableId: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
+          clientId: 9a8b7c6d-0000-4000-8000-cccccccccccc
+          partySize: 3
+          startedAt: '2026-10-29T18:00:00.000Z'
+          endedAt: null
+        table:
+          id: 7d1f3b4e-0a2c-4c5d-9e11-aaaaaaaaaaa1
+          restaurantId: rest-1
+          number: 1
+          description: Terraza
+          capacity: 4
+          status: ocupada
+          activeSessionId: 5c0e9a10-1b2c-4d3e-8f40-bbbbbbbbbbb1
+  responses:
+    Validacion:
+      description: |
+        Entrada invalida: estado desconocido, `number`, `capacity` o
+        `partySize` no enteros positivos (cero, negativos, fracciones, cadenas,
+        null) o campos obligatorios ausentes. Los nombres de error son
+        propuestos y se fijaran en T03.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          examples:
+            estado:
+              value: {error: InvalidTableStatusError, message: 'Invalid table status: cerrada. Must be one of: libre, ocupada, reservada'}
+            capacidad:
+              value: {error: InvalidTableCapacityError, message: 'Table capacity must be a positive integer'}
+            grupo:
+              value: {error: InvalidPartySizeError, message: 'Party size must be a positive integer'}
+    NoAutenticado:
+      description: JWT ausente, mal formado, invalido o caducado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAcceso'
+          examples:
+            ausente:
+              value: {error: 'Unauthorized: No token provided'}
+            invalido:
+              value: {error: 'Unauthorized: Invalid token'}
+    Prohibido:
+      description: |
+        Rol no permitido (`{error}` de middleware) o, en reglas de servicio,
+        restaurante distinto al del actor (manager/camarero) o intento de usar
+        una sesion ajena (`{error, message}`).
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ErrorAcceso'
+              - $ref: '#/components/schemas/ErrorAplicacion'
+          examples:
+            rol:
+              value: {error: 'Forbidden: Insufficient permissions'}
+            restaurante:
+              value: {error: ForbiddenRestaurantError, message: 'Actor cannot operate on this restaurant'}
+    NoEncontrado:
+      description: |
+        Restaurante inexistente, mesa inexistente, borrada o de otro
+        restaurante.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          examples:
+            mesa:
+              value: {error: TableNotFoundError, message: 'Table not found'}
+            restaurante:
+              value: {error: RestaurantNotFoundError, message: 'Restaurant not found'}
+    Conflicto:
+      description: |
+        Numero de mesa duplicado entre mesas no eliminadas del restaurante, o
+        capacidad inferior al grupo de la sesion de cliente activa.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          examples:
+            numero:
+              value: {error: TableNumberConflictError, message: 'Table number already exists in this restaurant'}
+            capacidad:
+              value: {error: TableCapacityConflictError, message: 'Capacity cannot be lower than the active party size'}
+    ConflictoOcupacion:
+      description: |
+        La mesa no esta libre (ocupada por otro, reservada o perdida en una
+        carrera), no tiene capacidad suficiente, o el cliente ya tiene una
+        sesion activa en el restaurante con otra mesa o grupo; en ese ultimo
+        caso recuperar con `GET .../table-sessions/current`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          examples:
+            noDisponible:
+              value: {error: TableNotAvailableError, message: 'Table is not available'}
+            capacidad:
+              value: {error: TableCapacityExceededError, message: 'Party size exceeds table capacity'}
+            sesionActiva:
+              value: {error: ActiveTableSessionExistsError, message: 'Client already has an active table session in this restaurant'}
+    ErrorInterno:
+      description: |
+        Error no derivado de AppError (fallos SQL inesperados). Se oculta el
+        detalle original y no se presenta como exito ni como lista vacia.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          example: {error: InternalServerError, message: Something went wrong}
