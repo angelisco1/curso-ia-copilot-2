@@ -135,10 +135,11 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
   - Dependencias: T04.
   - Comprobación: fixture con esquema anterior y pedido previo; detectar columna con `PRAGMA table_info`, añadir `table_session_id` nullable una sola vez; pedido/ítems previos intactos y reapertura correcta. No borrar `resttek.db`.
   - Evidencia: rojo con `npx vitest run src/config`: 4 tests fallidos (`table_session_id` inexistente en la base heredada y en la nueva). Verde: 16/16. Fixture con esquema anterior (pedido `o1` con mesa de texto `mesa-7` y dos ítems) creado con sqlite3 en archivo temporal: tras `initialize` la columna `table_session_id` (FK a `table_sessions`, nullable) existe una sola vez detectada con `PRAGMA table_info`, el pedido/ítems quedan intactos con `table_session_id` null y reabrir no repite la migración. FK aplicada a sesiones inexistentes. No se toca `resttek.db`. `npm test` 13 archivos / 139 tests en verde.
-- [ ] **T06 (10 min)** Persistir CRUD, disponibilidad y borrado lógico de mesas
+- [x] **T06 (10 min)** ~~Persistir CRUD, disponibilidad y borrado lógico de mesas~~
   - Archivos: `packages/api/src/repositories/table.repository.ts`, `table.repository.test.ts` (nuevos).
   - Dependencias: T04.
   - Comprobación: filtros por restaurante/estado/capacidad, duplicados por restaurante, número reutilizable tras borrado e IDs distintos; excluir borradas.
+  - Evidencia: rojo con `npx vitest run src/repositories/table.repository` (repositorio como stub `not implemented`): 10 tests fallidos. Verde: 10/10 contra SQLite en memoria. Verificado: alta/lectura con `activeSessionId` (solo sesión abierta), `findById` acotado a restaurante y sin borradas, listado por número, disponibilidad (solo libres, capacidad suficiente, orden capacidad/número, sin borradas ni otros restaurantes), duplicado por restaurante → `TableNumberConflictError`, mismo número en otro restaurante, número reutilizable tras borrado con id distinto (el id histórico se conserva), `updateDetails` sin tocar restaurante/estado, null para ajena/borrada y conflicto de número; errores SQL distintos de la unicidad no se ocultan. `npm test` 14 archivos / 149 tests; `tsc` sin errores nuevos.
 - [ ] **T07 (10 min)** Persistir ocupación y recuperación atómicas e idempotentes
   - Archivos: `packages/api/src/repositories/table-session.repository.ts`, `table-session.repository.test.ts` (nuevos); soporte transaccional acotado en `config/database.ts` si hace falta.
   - Dependencias: T04, T06.

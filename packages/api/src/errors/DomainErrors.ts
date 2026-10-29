@@ -198,3 +198,15 @@ export class InvalidTableIdError extends AppError {
         super('Table ID is required')
     }
 }
+
+export class TableNotFoundError extends AppError {
+    constructor() {
+        super('Table not found')
+    }
+}
+
+export class TableNumberConflictError extends AppError {
+    constructor() {
+        super('Table number already exists in this restaurant')
+    }
+}
