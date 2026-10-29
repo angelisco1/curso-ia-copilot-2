@@ -207,6 +207,16 @@ export class Database {
         for (const q of queries) {
             if (q.trim()) await this.run(q)
         }
+
+        await this.addColumnIfMissing('orders', 'table_session_id', 'TEXT REFERENCES table_sessions(id)')
+        await this.run('CREATE INDEX IF NOT EXISTS idx_orders_table_session ON orders(table_session_id)')
+    }
+
+    private async addColumnIfMissing(table: string, column: string, definition: string): Promise<void> {
+        const columns = await this.all<{ name: string }>(`PRAGMA table_info(${table})`)
+        if (!columns.some(c => c.name === column)) {
+            await this.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+        }
     }
 }
 

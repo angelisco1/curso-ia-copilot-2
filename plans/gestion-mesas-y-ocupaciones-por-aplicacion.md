@@ -130,10 +130,11 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
   - Dependencias: T03.
   - Comprobación: SQLite en memoria; FK de restaurante/mesa, unicidad de número activo y de sesiones abiertas; inicializar dos veces no duplica ni destruye datos.
   - Evidencia: rojo con `npx vitest run src/config`: 12 tests fallidos (`no such table: restaurant_tables`). Verde: 12/12. Se añade `restaurant_tables` y `table_sessions` con CHECK de estado/número/capacidad/grupo, FK a restaurante/mesa, índice único parcial de número entre no borradas y de sesión abierta por mesa y por (restaurante, cliente). Las unicidades las impone SQLite, base de las garantías de atomicidad de T07/T08. `Database` acepta ahora ruta opcional (necesaria para probar reinicialización sobre archivo temporal: datos y 3 índices intactos tras una segunda `initialize`). `npm test` 13 archivos / 135 tests en verde.
-- [ ] **T05 (10 min)** Evolucionar pedidos existentes sin borrar la base
+- [x] **T05 (10 min)** ~~Evolucionar pedidos existentes sin borrar la base~~
   - Archivos: `packages/api/src/config/database.ts`, `config/database.test.ts`.
   - Dependencias: T04.
   - Comprobación: fixture con esquema anterior y pedido previo; detectar columna con `PRAGMA table_info`, añadir `table_session_id` nullable una sola vez; pedido/ítems previos intactos y reapertura correcta. No borrar `resttek.db`.
+  - Evidencia: rojo con `npx vitest run src/config`: 4 tests fallidos (`table_session_id` inexistente en la base heredada y en la nueva). Verde: 16/16. Fixture con esquema anterior (pedido `o1` con mesa de texto `mesa-7` y dos ítems) creado con sqlite3 en archivo temporal: tras `initialize` la columna `table_session_id` (FK a `table_sessions`, nullable) existe una sola vez detectada con `PRAGMA table_info`, el pedido/ítems quedan intactos con `table_session_id` null y reabrir no repite la migración. FK aplicada a sesiones inexistentes. No se toca `resttek.db`. `npm test` 13 archivos / 139 tests en verde.
 - [ ] **T06 (10 min)** Persistir CRUD, disponibilidad y borrado lógico de mesas
   - Archivos: `packages/api/src/repositories/table.repository.ts`, `table.repository.test.ts` (nuevos).
   - Dependencias: T04.

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import sqlite3 from 'sqlite3'
 import { Database } from './database.js'
 
 const now = new Date().toISOString()
@@ -148,3 +149,88 @@ describe('inicializacion repetida sobre un archivo', () => {
         expect(indexes.length).toBe(3)
     })
 })
+
+describe('evolucion de pedidos existentes', () => {
+    let dir: string
+    let file: string
+
+    beforeEach(async () => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), 'resttek-legacy-'))
+        file = path.join(dir, 'legacy.db')
+        await createLegacyDatabase(file)
+    })
+
+    afterEach(() => {
+        fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    async function columns(db: Database): Promise<string[]> {
+        const info = await db.all<{ name: string }>('PRAGMA table_info(orders)')
+        return info.map(c => c.name)
+    }
+
+    it('anade table_session_id nullable una sola vez sin perder datos', async () => {
+        const db = new Database(file)
+        await db.initialize()
+        const cols = await columns(db)
+        expect(cols.filter(c => c === 'table_session_id')).toHaveLength(1)
+
+        const order = await db.get<Record<string, unknown>>('SELECT * FROM orders WHERE id = ?', ['o1'])
+        expect(order).toMatchObject({ id: 'o1', restaurant_id: 'r1', table_id: 'mesa-7', client_id: 'c1', table_session_id: null })
+        const items = await db.all<{ id: string; status: string }>('SELECT id, status FROM order_items WHERE order_id = ? ORDER BY id', ['o1'])
+        expect(items).toEqual([{ id: 'i1', status: 'pendiente' }, { id: 'i2', status: 'entregado' }])
+        await db.close()
+    })
+
+    it('reabrir la base no repite la migracion ni borra datos', async () => {
+        const first = new Database(file)
+        await first.initialize()
+        await first.close()
+
+        const second = new Database(file)
+        await second.initialize()
+        const cols = await columns(second)
+        expect(cols.filter(c => c === 'table_session_id')).toHaveLength(1)
+        const orders = await second.all<{ id: string }>('SELECT id FROM orders')
+        expect(orders).toEqual([{ id: 'o1' }])
+        await second.close()
+    })
+
+    it('un pedido nuevo puede referenciar una sesion y la FK se aplica', async () => {
+        const db = new Database(file)
+        await db.initialize()
+        await insertTable(db, 't1', 'r1', 1)
+        await insertSession(db, 's1', 'r1', 't1', 'c1')
+        await db.run('INSERT INTO orders (id, restaurant_id, table_id, client_id, created_at, table_session_id) VALUES (?, ?, ?, ?, ?, ?)',
+            ['o2', 'r1', 't1', 'c1', now, 's1'])
+        await expect(db.run('INSERT INTO orders (id, restaurant_id, table_id, client_id, created_at, table_session_id) VALUES (?, ?, ?, ?, ?, ?)',
+            ['o3', 'r1', 't1', 'c1', now, 'no-existe'])).rejects.toThrow(/FOREIGN KEY/)
+        await db.close()
+    })
+
+    it('una base nueva tambien tiene la columna', async () => {
+        const db = new Database()
+        await db.initialize()
+        expect(await columns(db)).toContain('table_session_id')
+        await db.close()
+    })
+})
+
+function createLegacyDatabase(file: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const raw = new sqlite3.Database(file, err => {
+            if (err) return reject(err)
+            raw.exec(`
+                CREATE TABLE restaurants (id TEXT PRIMARY KEY, name TEXT NOT NULL, address TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL, owner_first_name TEXT NOT NULL, owner_last_name TEXT NOT NULL, logo_url TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+                CREATE TABLE dishes (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, price REAL NOT NULL, category TEXT NOT NULL, available INTEGER NOT NULL DEFAULT 1, restaurant_id TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(restaurant_id) REFERENCES restaurants(id));
+                CREATE TABLE orders (id TEXT PRIMARY KEY, restaurant_id TEXT NOT NULL, table_id TEXT, client_id TEXT, created_at TEXT NOT NULL, FOREIGN KEY(restaurant_id) REFERENCES restaurants(id));
+                CREATE TABLE order_items (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, dish_id TEXT NOT NULL, quantity INTEGER NOT NULL, notes TEXT, status TEXT NOT NULL, FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE, FOREIGN KEY(dish_id) REFERENCES dishes(id));
+                INSERT INTO restaurants VALUES ('r1', 'R', 'A', 'r@r.com', '1', 'O', 'W', NULL, '${now}', '${now}');
+                INSERT INTO dishes VALUES ('d1', 'Plato', NULL, 5, 'principal', 1, 'r1', '${now}', '${now}');
+                INSERT INTO orders VALUES ('o1', 'r1', 'mesa-7', 'c1', '${now}');
+                INSERT INTO order_items VALUES ('i1', 'o1', 'd1', 1, NULL, 'pendiente');
+                INSERT INTO order_items VALUES ('i2', 'o1', 'd1', 1, NULL, 'entregado');
+            `, err2 => raw.close(err3 => (err2 || err3) ? reject(err2 || err3) : resolve()))
+        })
+    })
+}
