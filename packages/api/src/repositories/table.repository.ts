@@ -20,7 +20,7 @@ export interface TableRepository {
     updateDetails(restaurantId: string, tableId: string, details: TableDetails): Promise<RestaurantTable | null>
 }
 
-interface TableRow {
+export interface TableRow {
     id: string
     restaurant_id: string
     number: number
@@ -30,7 +30,7 @@ interface TableRow {
     active_session_id: string | null
 }
 
-const SELECT_TABLE = `
+export const SELECT_TABLE = `
     SELECT t.id, t.restaurant_id, t.number, t.description, t.capacity, t.status,
            (SELECT s.id FROM table_sessions s WHERE s.table_id = t.id AND s.ended_at IS NULL) AS active_session_id
     FROM restaurant_tables t

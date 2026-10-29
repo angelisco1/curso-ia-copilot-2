@@ -210,3 +210,21 @@ export class TableNumberConflictError extends AppError {
         super('Table number already exists in this restaurant')
     }
 }
+
+export class TableNotAvailableError extends AppError {
+    constructor() {
+        super('Table is not available')
+    }
+}
+
+export class TableCapacityExceededError extends AppError {
+    constructor() {
+        super('Party size exceeds table capacity')
+    }
+}
+
+export class ActiveTableSessionExistsError extends AppError {
+    constructor() {
+        super('Client already has an active table session in this restaurant')
+    }
+}

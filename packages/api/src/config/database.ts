@@ -6,6 +6,12 @@ import { DatabaseNotInitializedError } from '@errors/DomainErrors.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+export interface DbExecutor {
+    run(sql: string, params?: any[]): Promise<sqlite3.RunResult>
+    all<T>(sql: string, params?: any[]): Promise<T[]>
+    get<T>(sql: string, params?: any[]): Promise<T | undefined>
+}
+
 export class Database {
     private db: sqlite3.Database | null = null
     private dbPath: string
@@ -49,7 +55,33 @@ export class Database {
         return this.db
     }
 
-    public async run(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
+    /**
+     * Ejecuta sentencias de una en una (FIFO) sobre la conexion compartida. Una
+     * transaccion mantiene el turno hasta COMMIT/ROLLBACK, de modo que ninguna
+     * otra sentencia se intercala dentro de ella. Dentro de `transaction` hay
+     * que usar el `tx` recibido: llamar a `run/all/get` del propio Database
+     * esperaria a que termine la transaccion (interbloqueo).
+     */
+    private lockTail: Promise<void> = Promise.resolve()
+
+    private async acquire(): Promise<() => void> {
+        const previous = this.lockTail
+        let release!: () => void
+        this.lockTail = new Promise<void>(resolve => { release = resolve })
+        await previous
+        return release
+    }
+
+    private async exclusive<T>(work: () => Promise<T>): Promise<T> {
+        const release = await this.acquire()
+        try {
+            return await work()
+        } finally {
+            release()
+        }
+    }
+
+    private rawRun(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
         return new Promise((resolve, reject) => {
             this.getDb().run(sql, params, function (err) {
                 if (err) return reject(err)
@@ -58,7 +90,7 @@ export class Database {
         })
     }
 
-    public async all<T>(sql: string, params: any[] = []): Promise<T[]> {
+    private rawAll<T>(sql: string, params: any[] = []): Promise<T[]> {
         return new Promise((resolve, reject) => {
             this.getDb().all(sql, params, (err, rows) => {
                 if (err) return reject(err)
@@ -67,12 +99,43 @@ export class Database {
         })
     }
 
-    public async get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+    private rawGet<T>(sql: string, params: any[] = []): Promise<T | undefined> {
         return new Promise((resolve, reject) => {
             this.getDb().get(sql, params, (err, row) => {
                 if (err) return reject(err)
                 resolve(row as T)
             })
+        })
+    }
+
+    public async run(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
+        return this.exclusive(() => this.rawRun(sql, params))
+    }
+
+    public async all<T>(sql: string, params: any[] = []): Promise<T[]> {
+        return this.exclusive(() => this.rawAll<T>(sql, params))
+    }
+
+    public async get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+        return this.exclusive(() => this.rawGet<T>(sql, params))
+    }
+
+    public async transaction<T>(work: (tx: DbExecutor) => Promise<T>): Promise<T> {
+        return this.exclusive(async () => {
+            await this.rawRun('BEGIN IMMEDIATE')
+            const tx: DbExecutor = {
+                run: (sql, params) => this.rawRun(sql, params),
+                all: <R>(sql: string, params?: any[]) => this.rawAll<R>(sql, params),
+                get: <R>(sql: string, params?: any[]) => this.rawGet<R>(sql, params)
+            }
+            try {
+                const result = await work(tx)
+                await this.rawRun('COMMIT')
+                return result
+            } catch (error) {
+                await this.rawRun('ROLLBACK').catch(() => undefined)
+                throw error
+            }
         })
     }
 

@@ -234,3 +234,87 @@ function createLegacyDatabase(file: string): Promise<void> {
         })
     })
 }
+
+describe('transacciones sobre la conexion compartida', () => {
+    let db: Database
+
+    beforeEach(async () => {
+        db = new Database()
+        await db.initialize()
+        await insertRestaurant(db, 'r1')
+    })
+
+    afterEach(async () => {
+        await db.close()
+    })
+
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    const countTables = async () => (await db.get<{ c: number }>('SELECT COUNT(*) AS c FROM restaurant_tables'))!.c
+
+    it('confirma todas las escrituras si el trabajo termina bien', async () => {
+        const result = await db.transaction(async tx => {
+            await tx.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['a', 'r1', 1, 2, 'libre', now, now])
+            await tx.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['b', 'r1', 2, 2, 'libre', now, now])
+            return 'ok'
+        })
+        expect(result).toBe('ok')
+        expect(await countTables()).toBe(2)
+    })
+
+    it('revierte todas las escrituras y propaga el error original si el trabajo falla', async () => {
+        const boom = new Error('boom')
+        await expect(db.transaction(async tx => {
+            await tx.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['a', 'r1', 1, 2, 'libre', now, now])
+            throw boom
+        })).rejects.toBe(boom)
+        expect(await countTables()).toBe(0)
+    })
+
+    it('revierte si una sentencia SQL falla a mitad de la transaccion', async () => {
+        await expect(db.transaction(async tx => {
+            await tx.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['a', 'r1', 1, 2, 'libre', now, now])
+            await tx.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['b', 'r1', 1, 2, 'libre', now, now])
+        })).rejects.toThrow(/UNIQUE/)
+        expect(await countTables()).toBe(0)
+    })
+
+    it('las consultas ajenas no se intercalan dentro de una transaccion en curso', async () => {
+        let seenOutside: number | undefined
+        const tx = db.transaction(async t => {
+            await t.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['a', 'r1', 1, 2, 'libre', now, now])
+            await wait(30)
+            throw new Error('rollback')
+        })
+        await wait(5)
+        const outside = countTables().then(c => { seenOutside = c })
+        await expect(tx).rejects.toThrow('rollback')
+        await outside
+        expect(seenOutside).toBe(0)
+    })
+
+    it('una escritura ajena emitida durante la transaccion no se pierde ni se revierte con ella', async () => {
+        const tx = db.transaction(async t => {
+            await t.run('INSERT INTO restaurant_tables (id, restaurant_id, number, capacity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', ['a', 'r1', 1, 2, 'libre', now, now])
+            await wait(30)
+            throw new Error('rollback')
+        })
+        await wait(5)
+        const outside = insertTable(db, 'outside', 'r1', 2)
+        await expect(tx).rejects.toThrow('rollback')
+        await outside
+        const ids = (await db.all<{ id: string }>('SELECT id FROM restaurant_tables')).map(r => r.id)
+        expect(ids).toEqual(['outside'])
+    })
+
+    it('las transacciones concurrentes se serializan', async () => {
+        const order: string[] = []
+        const make = (name: string) => db.transaction(async t => {
+            order.push(`${name}:start`)
+            await t.run('SELECT 1')
+            await wait(10)
+            order.push(`${name}:end`)
+        })
+        await Promise.all([make('a'), make('b'), make('c')])
+        expect(order).toEqual(['a:start', 'a:end', 'b:start', 'b:end', 'c:start', 'c:end'])
+    })
+})
