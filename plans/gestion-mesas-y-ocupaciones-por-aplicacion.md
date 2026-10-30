@@ -361,10 +361,11 @@ Propiedad: documentación general y seguimiento final. No utilizar esta fase par
 > - Plan: se unifican las cuatro copias; la base es la de la API y se toman los bloques B, C y D y las evidencias de CA de cada rama.
 > - Validación tras integrar: `npm test` 25 archivos / 307 tests; `tsc --noEmit` exit 0; web-admin 87 tests y build OK; web-empleados 135 tests (60 de mesas + los de control de acceso de master) y build OK; web-clientes 113 tests y build OK. Sin navegador.
 
-- [ ] **T45 (10 min)** Actualizar modelo de datos, glosario y arquitectura de API
+- [x] **T45 (10 min)** ~~Actualizar modelo de datos, glosario y arquitectura de API~~
   - Archivos: `docs/dominio/modelo-datos.md`, `docs/dominio/glosario.md`, `docs/arquitectura/arquitectura-api.md`.
   - Dependencias: T17.
   - Comprobación: ER incluye mesas/sesiones y relación con pedidos, borrado lógico, transiciones y migración sin borrar BD; enlazar OpenAPI, no duplicarlo.
+  - Evidencia: `modelo-datos.md` incluye en el ER `restaurant_tables` y `table_sessions` y su relación con `orders.table_session_id`, tablas con restricciones (índices únicos parciales y CHECK), borrado lógico, ciclo de transiciones, campos calculados de lectura y sección «Evolución del esquema» (`addColumnIfMissing` con `PRAGMA table_info`, sin borrar `resttek.db`), que sustituye la nota antigua de «borrar y volver a sembrar». `glosario.md`: entidades mesa y ocupación, estados de mesa, regla de pedido dentro de la ocupación y permisos de mesas. `arquitectura-api.md`: dominio `table` por capas, tabla de endpoints de mesas y ocupaciones, reglas de `POST /orders` para clientes, mapa de errores 401/403/404/409 actualizado, `transaction()` y cola exclusiva, y tests HTTP con supertest (sustituye el «no hay tests HTTP»). Enlaza `tables.openapi.yaml` y `orders.openapi.yaml` sin duplicar sus ejemplos. Afirmaciones contrastadas con `database.ts`, `errorHandler.ts`, `order.controller.ts`, `order.repository.ts` (`createInSession` en transacción) y las rutas. Enlaces relativos y anclas comprobados.
 - [ ] **T46 (10 min)** Documentar recorrido y organización frontend por aplicación
   - Archivos: `README.md`, `docs/arquitectura/arquitectura-frontend.md`.
   - Dependencias: T25, T33, T44.
