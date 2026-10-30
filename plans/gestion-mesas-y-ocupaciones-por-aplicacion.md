@@ -234,18 +234,21 @@ Propiedad: `packages/web-empleados/**`. Mantener intacta la matriz de acceso exi
   - Dependencias: T26.
   - Comprobación: carga inicial y polling de 30 s, un único intervalo, limpieza al destruir/cambiar restaurante; respuestas tardías descartadas, errores visibles sin falsos éxitos.
   - Evidencia: `table.store.spec.ts` (14 casos, fake timers): carga inicial, polling 30 s con un único intervalo (también tras reiniciar), `stopPolling`, respuesta tardía de otro restaurante descartada, error visible sin vaciar mesas, PATCH sin actualizar antes del éxito, doble envío bloqueado, error de servidor, detalle por mesa/sesión (tardías descartadas, última petición gana, liberar limpia). Mutaciones que hacen fallar el spec: quitar la generación al cargar, no limpiar el intervalo, quitar el bloqueo de doble envío, quitar el contador de petición de detalle. `npm run test -w @resttek/web-empleados` verde (23 tests).
-- [ ] **T28 (10 min)** Mostrar en salón todas las mesas con sus estados
+- [x] **T28 (10 min)** ~~Mostrar en salón todas las mesas con sus estados~~
   - Archivos: `packages/web-empleados/src/app/features/orders/pages/salon/salon.component.{ts,html,css}`, `salon.component.spec.ts` (nuevo); componente presentacional de mesa dentro de `features/tables/` si se reutiliza.
   - Dependencias: T27.
   - Comprobación: libre/ocupada/reservada distinguibles con texto, número y capacidad; mesa ocupada sin pedidos muestra ese caso, no desaparece.
-- [ ] **T29 (10 min)** Incorporar cambio de estado con confirmación y errores
+  - Evidencia: `salon.component.spec.ts` (bloque T28): renderiza todas las mesas con «Mesa N», «Capacidad: N» y estado en texto (libre/ocupada/reservada), mesa ocupada sin pedidos visible, cargando/error/vacío explícitos, polling con restaurante del JWT y parada al destruir. Mutaciones comprobadas (no confirmar, quitar `disabled`, quitar etiqueta, quitar guarda de admin) hacen fallar el spec. Nota: salón, `TableOrdersComponent`, `table-label` y cambios de `OrderStore` van en este commit porque el salón los importa.
+- [x] **T29 (10 min)** ~~Incorporar cambio de estado con confirmación y errores~~
   - Archivos: salón y store de mesas con tests.
   - Dependencias: T28.
   - Comprobación: tres estados, confirmación al cerrar ocupación, bloquear doble envío; liberar con pedidos pendientes permitido y advertido; mostrar errores del servidor y no actualizar antes del éxito.
-- [ ] **T30 (10 min)** Añadir detalle de pedidos exclusivamente de la visita actual
+  - Evidencia: `salon.component.spec.ts` (bloque T29) + `table.store.spec.ts`: tres botones de estado con el actual marcado; `confirm` solo al cerrar ocupación (cancelar no llama al store); liberar con pendientes permitido, advertido y sin llamar a `updateItemStatus`; no actúa si mismo estado o mesa en actualización (botones `disabled`); PATCH sin actualizar antes del éxito, error del servidor visible. Limitación: el aviso de pendientes solo cuenta ítems si el detalle de esa mesa está abierto.
+- [x] **T30 (10 min)** ~~Añadir detalle de pedidos exclusivamente de la visita actual~~
   - Archivos: salón; `features/tables/components/table-orders/` (nuevo) y sus tests.
   - Dependencias: T28.
   - Comprobación: mostrar estados de todos los ítems incluidos entregados, distinguir pedidos múltiples y refrescar detalle; cambio de sesión/mesa descarta respuesta tardía y borra detalle anterior.
+  - Evidencia: `table-orders.component.spec.ts` (pedidos separados «Pedido 1/2», todos los ítems incluidos entregados, vacío/cargando/error), bloque T30 de `salon.component.spec.ts` (ver pedidos solo en ocupadas, mesa sin visita) y `table.store.spec.ts` (cambio de mesa/sesión borra detalle y descarta respuesta tardía; última petición gana). El detalle usa solo `GET .../tables/:id/orders` (visita actual).
 - [ ] **T31 (10 min)** Mantener entregas y visibilidad de pedidos de visitas cerradas
   - Archivos: salón, `features/orders/models/order.model.ts`, modelos/templates de barra y cocina para etiquetas de mesa cuando proceda; tests de filtros.
   - Dependencias: T02, T29, T30.

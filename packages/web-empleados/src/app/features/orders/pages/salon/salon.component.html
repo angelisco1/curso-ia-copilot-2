@@ -2,6 +2,85 @@
   <h1>Salón</h1>
 </div>
 
+@if (canChooseRestaurant()) {
+  <div class="restaurant-picker">
+    <label for="restaurant-select">Restaurante</label>
+    <select id="restaurant-select" [value]="selectedRestaurantId() ?? ''" (change)="selectRestaurant($any($event.target).value)">
+      <option value="">Selecciona un restaurante</option>
+      @for (r of restaurants(); track r.id) {
+        <option [value]="r.id" [selected]="r.id === selectedRestaurantId()">{{ r.name }}</option>
+      }
+    </select>
+  </div>
+  @if (restaurantsError()) {
+    <div class="alert-error" role="alert">{{ restaurantsError() }}</div>
+  }
+}
+
+@if (canChooseRestaurant() && !selectedRestaurantId()) {
+  <div class="empty-state"><p>Selecciona un restaurante para ver sus mesas y entregas</p></div>
+} @else {
+
+<h2 class="section-title">Mesas</h2>
+
+@if (tableStore.error()) {
+  <div class="alert-error" role="alert">{{ tableStore.error() }}</div>
+}
+@if (tableStore.statusError()) {
+  <div class="alert-error" role="alert">{{ tableStore.statusError() }}</div>
+}
+
+@if (tableStore.loading() && tableStore.tables().length === 0) {
+  <div class="spinner"></div>
+} @else if (tableStore.tables().length === 0 && !tableStore.error()) {
+  <div class="empty-state"><p>Este restaurante no tiene mesas</p></div>
+} @else {
+  <div class="tables-grid">
+    @for (table of tableStore.tables(); track table.id) {
+      <article class="table-card" [class.selected]="table.id === tableStore.selectedTableId()">
+        <header>
+          <strong>Mesa {{ table.number }}</strong>
+          <span class="status status-{{ table.status }}">{{ table.status }}</span>
+        </header>
+        <p class="table-meta">Capacidad: {{ table.capacity }}@if (table.description) { · {{ table.description }}}</p>
+        <div class="table-actions">
+          @for (s of statuses; track s) {
+            <button
+              type="button"
+              class="btn btn-sm"
+              [class.btn-primary]="s === table.status"
+              [attr.aria-pressed]="s === table.status"
+              [disabled]="isUpdating(table)"
+              (click)="changeStatus(table, s)">{{ s }}</button>
+          }
+        </div>
+        @if (table.status === 'ocupada') {
+          <button type="button" class="btn btn-sm" (click)="openTable(table)">Ver pedidos de la visita</button>
+        }
+      </article>
+    }
+  </div>
+}
+
+@if (selectedTable(); as table) {
+  <section class="table-detail" aria-live="polite">
+    <header class="detail-header">
+      <h3>Pedidos de la mesa {{ table.number }} (visita actual)</h3>
+      <button type="button" class="btn btn-sm" (click)="tableStore.clearDetail()">Cerrar</button>
+    </header>
+    @if (!table.activeSessionId) {
+      <p class="empty">Esta mesa no tiene una visita abierta.</p>
+    } @else {
+      <app-table-orders
+        [orders]="tableStore.detailOrders()"
+        [loading]="tableStore.detailLoading()"
+        [error]="tableStore.detailError()" />
+    }
+  </section>
+}
+
+<h2 class="section-title">Entregas pendientes</h2>
+
 @if (orderStore.loading() && orderStore.orders().length === 0) {
   <div class="spinner"></div>
 }
@@ -21,8 +100,11 @@
         <div class="order-card">
           <div class="order-header">
             <span class="order-id">Pedido #{{ order.id.substring(0, 8) }}</span>
-            @if (order.tableId) {
-              <span class="table-badge table-highlight">Mesa {{ order.tableId }}</span>
+            @if (tableLabel(order); as label) {
+              <span class="table-badge table-highlight">Mesa {{ label }}</span>
+            }
+            @if (isClosedVisit(order)) {
+              <span class="table-badge">Visita cerrada</span>
             }
           </div>
           <div class="order-items">
@@ -48,4 +130,5 @@
       }
     </div>
   }
+}
 }
