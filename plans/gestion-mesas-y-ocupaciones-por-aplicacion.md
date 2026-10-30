@@ -5,7 +5,7 @@
 - Worktree de implementación: `.vscode/worktrees/21/gestion-mesas`.
 - Rama base: `development` (si no existe, crear desde `main` o, en su defecto, `master`).
 - Validación del nombre: `git check-ref-format --branch 21/gestion-mesas`, correcta durante la planificación.
-- Estado: bloque A (API, T01–T17) implementado y verificado localmente; bloques B–E pendientes.
+- Estado: bloques A–D (T01–T44) implementados y verificados localmente, e integrados en `21/gestion-mesas` junto con `master` (2026-10-30). Pendientes T45–T47 (documentación general y aceptación cruzada en navegador) y la marca de todos los CA.
 - Organización: un bloque por aplicación, contratos previos y una integración final. Los identificadores Txx son pasos, no nuevas issues.
 
 ## Objetivo
@@ -200,128 +200,166 @@ Propiedad: `packages/api/**`. Este agente entrega contrato y backend; no modific
 
 Propiedad: `packages/web-admin/**`. No modificar API, otros frontends ni documentación general.
 
-- [ ] **T18 (10 min)** Añadir modelos y servicio HTTP de mesas
+- [x] **T18 (10 min)** ~~Añadir modelos y servicio HTTP de mesas~~
   - Archivos: `packages/web-admin/src/app/features/tables/models/table.model.ts`, `services/table.service.ts`, `services/table.service.spec.ts` (nuevos).
   - Dependencias: T01.
   - Comprobación: HttpTestingController verifica paths con restaurante, métodos CRUD, DTOs y propagación de conflictos; sin importar tipos de otras apps.
-- [ ] **T19 (10 min)** Añadir store de mesas aislado por restaurante
+  - Evidencia (agente admin, rama `21/gestion-mesas-admin`): contrato leído de `packages/api/docs/tables.openapi.yaml` (solo lectura, no incluido en commits). Rojo: con modelo y servicio esqueleto que lanza `not implemented`, `npm run test -w @resttek/web-admin -- --include '**/table.service.spec.ts'` → 6 de 6 tests fallan con `Error: not implemented`. Verde: tras implementar `TableService` (GET lista/uno, POST, PUT, DELETE bajo `/restaurants/:id/tables`), suite admin completa `npm run test -w @resttek/web-admin` → 5 archivos, 19 tests pasan (13 previos + 6). El 409 se propaga con `status` y cuerpo `{error,message}`. No se usa PATCH ni endpoints de otras apps.
+- [x] **T19 (10 min)** ~~Añadir store de mesas aislado por restaurante~~
   - Archivos: `packages/web-admin/src/app/features/tables/store/table.store.ts`, `table.store.spec.ts` (nuevos).
   - Dependencias: T18.
   - Comprobación: signals de datos/carga/error, mutaciones tras éxito; cambiar A→B limpia A y una respuesta tardía de A no sustituye B ni su error/carga.
-- [ ] **T20 (10 min)** Crear listado de mesas con estados y borrado confirmado
-  - Archivos: `packages/web-admin/src/app/features/tables/pages/table-list/table-list.component.{ts,html,css,spec.ts}` (nuevos).
+  - Evidencia: Rojo: con `TableStore` esqueleto vacío, `npm run test -w @resttek/web-admin -- --include '**/table.store.spec.ts'` → 9 de 9 fallan por aserciones. Verde: tras implementar (secuencia de carga, `restaurantId` actual, mutaciones aplicadas solo tras éxito y solo si el restaurante sigue siendo el actual, lista ordenada por número, errores de mutación relanzados sin tocar la lista), suite admin completa → 6 archivos, 28 tests pasan. Cubre A→B con datos/error/carga tardíos de A ignorados.
+- [x] **T20 (10 min)** ~~Crear listado de mesas con estados y borrado confirmado~~
+  - Archivos: `packages/web-admin/src/app/features/tables/pages/table-list/table-list.page.{ts,html,css,spec.ts}` (nuevos; clase `TableListPage`).
   - Dependencias: T19.
   - Comprobación: columnas de los cinco campos, acciones de alta/edición/borrado, estados vacío/cargando/error y aviso de cierre de ocupación/conservación de pedidos antes de borrar.
-- [ ] **T21 (10 min)** Crear formulario de alta con validación de campos
-  - Archivos: `packages/web-admin/src/app/features/tables/pages/table-form/table-form.component.{ts,html,css,spec.ts}` (nuevos).
+  - Ajuste de nomenclatura: el plan original decía `table-list.component.*`; por ser una pantalla asociada a una ruta se usa la convención de pages (`*.page.*`, clase `*Page`) de las instrucciones del agente frontend. Lo mismo aplica a `table-form` (T21/T22). No se renombran pantallas existentes.
+  - Evidencia: Rojo: con `TableListPage` vacía, `--include '**/table-list.page.spec.ts'` → 9 de 9 fallan por aserciones (no carga, sin columnas/enlaces/estados, sin botón de borrar). Verde: tras implementar página, plantilla y estilos, suite admin completa → 7 archivos, 37 tests pasan. Verificado con DOM real y rutas (`RouterTestingHarness`): carga del restaurante de la ruta, columnas Número/Descripción/Capacidad/Estado, filas con Libre/Ocupada/Reservada, enlaces `/restaurants/rest-1/tables/new` y `.../t1/edit`, botón borrar, spinner, error, vacío, `confirm` con aviso de cierre de ocupación y conservación de pedidos, cancelar no llama a la API, confirmar llama `delete('rest-1','t1')`, fallo mantiene la fila y muestra error.
+- [x] **T21 (10 min)** ~~Crear formulario de alta con validación de campos~~
+  - Archivos: `packages/web-admin/src/app/features/tables/pages/table-form/table-form.page.{ts,html,css,spec.ts}` (nuevos; clase `TableFormPage`, ver ajuste de nomenclatura en T20).
   - Dependencias: T19.
   - Comprobación: entero positivo para número/capacidad, descripción y selector de tres estados; envío bloqueado mientras inválido o guardando; mostrar conflicto de número.
-- [ ] **T22 (10 min)** Completar edición y errores de cambios de estado/capacidad
+  - Evidencia: Rojo: con `TableFormPage` vacía, `--include '**/table-form.page.spec.ts'` → 12 de 12 fallan (no existen campos, botón ni mensajes). Verde: con formulario reactivo y validador de entero positivo, suite admin completa → 8 archivos, 49 tests pasan. Verificado: campos número/descripción/capacidad y selector con exactamente `libre/ocupada/reservada` (por defecto libre); botón deshabilitado y sin llamada al store con formulario inválido; 0, -1 y 1.5 rechazados en número y capacidad con mensaje; descripción vacía admitida; alta envía `create('rest-1', {number:3, description:'', capacity:4, status:'reservada'})` y vuelve a `/restaurants/rest-1/tables`; segundo envío bloqueado mientras guarda («Guardando...»); 409 muestra «Ya existe una mesa con ese número…» y permite reintentar; otros errores muestran mensaje genérico. La edición se añade en T22.
+- [x] **T22 (10 min)** ~~Completar edición y errores de cambios de estado/capacidad~~
   - Archivos: formulario de T21 y sus tests.
   - Dependencias: T21.
   - Comprobación: precarga, guardar conserva id/restaurante, error de capacidad o recurso borrado visible; liberar mesa ocupada advierte que puede haber pedidos pendientes y no los elimina.
-- [ ] **T23 (10 min)** Conectar rutas, dashboard y menú lateral solo para admin
-  - Archivos: `packages/web-admin/src/app/features/tables/tables.routes.ts` (nuevo), `app.routes.ts`, `core/layout/shell.component.html`, dashboard del restaurante; tests de rutas/navegación nuevos.
+  - Evidencia: Rojo: ampliado `table-form.page.spec.ts` con 10 tests de edición; `--include '**/table-form.page.spec.ts'` → 10 fallan y los 12 de alta siguen pasando (la página aún no cargaba ni actualizaba). Verde: tras añadir carga por `TableService.getById`, `store.update` y avisos, suite admin completa → 8 archivos, 59 tests pasan. Verificado: precarga de los cuatro campos (incluido estado), título «Editar mesa», guardar llama `update('rest-1','t1',{…})` sin `create` y vuelve al listado, 409 de capacidad («La capacidad no puede ser menor…»), 409 de número duplicado, 404 al guardar o cargar («La mesa ya no existe o fue borrada…») con guardado bloqueado si falla la carga, `confirm` al pasar ocupada→libre/reservada con «pedidos pendientes… no se eliminan», cancelar no guarda, aceptar guarda, y sin aviso si sigue ocupada o no estaba ocupada. Nota: los nombres de error de la API están marcados «propuestos» en el contrato; la clasificación 409 se apoya en el texto `capacity`/`number` y, si no lo reconoce, muestra un mensaje que cubre ambas causas.
+- [x] **T23 (10 min)** ~~Conectar rutas, dashboard y menú lateral solo para admin~~
+  - Archivos: `packages/web-admin/src/app/features/tables/tables.routes.ts` (nuevo), `app.routes.ts`, `app.config.ts` (icono), `core/auth/admin.guard.ts` (nuevo, local de admin), `core/layout/shell.component.html`, dashboard del restaurante; tests nuevos `admin.guard.spec.ts`, `tables.routes.spec.ts`, `shell.component.spec.ts`, `restaurant-dashboard.component.spec.ts`.
   - Dependencias: T20, T22.
   - Comprobación: acceso desde restaurante al listado/nuevo/editar; guard específico de admin en rutas de mesas, no solo ocultar enlaces; manager no obtiene CRUD entrando URL directa. No cambiar permisos de features ajenas.
-- [ ] **T24 (10 min)** Probar navegación entre restaurantes y errores de CRUD
-  - Archivos: tests del store, listado, formulario y rutas de mesas.
+  - Evidencia: Rojo: con guard que devolvía `true` y `TABLE_ROUTES` vacío, `npm run test -w @resttek/web-admin` → 16 tests nuevos fallan (rutas sin definir, guard sin redirección, sin enlace/tarjeta Mesas); los de «manager no ve el enlace» ya pasaban porque el comportamiento previo no mostraba nada. Verde: tras implementar `adminGuard` (admin pasa; no autenticado → `/login`; resto → `/restaurants/:id/dashboard` o `/dashboard`), `TABLE_ROUTES` (`''`, `new`, `:id/edit`), ruta `restaurants/:restaurantId/tables` con `canActivate: [adminGuard]` y `loadChildren`, enlace «Mesas» en el menú lateral y tarjeta en el dashboard solo para admin, suite admin completa → 12 archivos, 79 tests pasan. Verificado con navegación real del router: admin entra a `/restaurants/rest-1/tables`, `/new` y `/t1/edit`; un manager por URL directa a las tres es redirigido a `/restaurants/rest-1/dashboard`. Las rutas y permisos de platos, ingredientes y empleados no se modificaron. Icono `LayoutGrid` registrado en `app.config.ts`.
+- [x] **T24 (10 min)** ~~Probar navegación entre restaurantes y errores de CRUD~~
+  - Archivos: tests del store, listado, formulario y rutas de mesas (`tables.navigation.spec.ts` nuevo) y `table-form.page.{ts,html}`.
   - Dependencias: T23.
   - Comprobación: navegar A→B con componente reutilizado actualiza listado y rutas de acciones; fallo HTTP no borra fila ni notifica éxito; cancelar confirmación no llama al servidor.
-- [ ] **T25 (5 min)** Validar el paquete admin y registrar evidencia
+  - Evidencia: Rojo: `tables.navigation.spec.ts` (8 tests con store y HTTP reales, `HttpTestingController`) → 7 pasan y 1 falla: el formulario de edición no recargaba al pasar de restaurante/mesa A a B (defecto real: `TableFormPage` leía `restaurantId` e `id` del snapshot y la page se reutiliza). Verde: `restaurantId`, `tableId`, `isEditing`, `pageTitle` y `listUrl` pasan a signals/computed reactivos a `paramMap` (padre e hija), con descarte de cargas/envíos obsoletos; suite admin completa → 13 archivos, 87 tests pasan. Verificado: listado A→B recarga contra B, respuesta tardía de A ignorada, fallo HTTP al borrar mantiene la fila, borrado correcto, cancelar `confirm` no llama a la API, error de carga y 409 al guardar visibles.
+- [x] **T25 (5 min)** ~~Validar el paquete admin y registrar evidencia~~
   - Archivos: este plan.
   - Dependencias: T17, T24.
   - Comprobación: `npm run test -w @resttek/web-admin` y `npm run build -w @resttek/web-admin`; prueba manual CRUD con API real, incluidos número duplicado y capacidad insuficiente durante ocupación.
+  - Evidencia (agente admin): revisión T18–T24 contra `git show 21/gestion-mesas:packages/api/docs/tables.openapi.yaml`: paths (`/api/v1/restaurants/:id/tables[/:tableId]`), métodos (GET/POST/PUT/DELETE; PATCH de estado no usado por admin), DTOs (`CreateTableDto`, `UpdateTableDto` con los cuatro campos obligatorios) y `Mesa` coinciden; el mapeo de 409 del formulario se basa en `error`/`message` (`TableNumberConflictError`, `TableCapacityConflictError`) y 404 (`TableNotFoundError`) y es correcto; no hubo que corregir código. `npm run test -w @resttek/web-admin` → 13 archivos, 87 tests pasan; `npm run build -w @resttek/web-admin` → exit 0. Prueba contra API real SIN navegador: API de `21/gestion-mesas` (commit 9cc7205) en worktree desacoplado temporal con BD propia y `npm run seed`, `PORT=3011`; script curl (`login` admin/gerente1/cliente1) que reproduce las peticiones exactas de `TableService` (no se arrancó `ng serve`; no se probó en navegador). Resultados: POST alta → 201 (id nuevo, `activeSessionId` null); POST número duplicado → 409 `TableNumberConflictError`; PUT edición (número 50, capacidad 6, estado reservada→libre) → 200 con el mismo id; cliente1 ocupa la mesa con `partySize` 5 (POST `table-sessions` → 201); PUT capacidad 3 → 409 `TableCapacityConflictError` y la mesa queda intacta; PUT capacidad 5 → 200; manager POST → 403; DELETE de mesa ocupada por cliente → 204; GET/DELETE/PUT de la mesa borrada → 404 `TableNotFoundError`; el número 50 se reutiliza tras el borrado (201). Worktree temporal y proceso API eliminados. Limitación: la UI (cargas, mensajes) solo está cubierta por tests de componente con HTTP simulado.
 
 ### C. Empleados — agente Frontend Angular, alcance web-empleados
 
 Propiedad: `packages/web-empleados/**`. Mantener intacta la matriz de acceso existente a cocina/barra/salón.
 
-- [ ] **T26 (10 min)** Añadir modelos y servicio de mesas, estado y pedidos de visita
+> **Estado (2026-10-29):** la excepción «sin tests» queda superada. Se añadió infraestructura de pruebas a web-empleados (target `test` con vitest, igual que web-admin; commit `build(web-empleados)`), y cada tarea se verifica con specs. No se integró `1/control-acceso-por-rol-web-empleados` (que no existe en esta base): el acceso al salón usa `core/auth/salon-access.ts` (ver T32); cocina/barra no se tocaron.
+
+- [x] **T26 (10 min)** ~~Añadir modelos y servicio de mesas, estado y pedidos de visita~~
   - Archivos: `packages/web-empleados/src/app/features/tables/models/table.model.ts`, `services/table.service.ts`, `services/table.service.spec.ts` (nuevos); `features/orders/models/order.model.ts`.
   - Dependencias: T01, T02.
   - Comprobación: tests de HTTP verifican consulta, PATCH y pedidos de sesión actual; campos opcionales históricos compatibles.
-- [ ] **T27 (10 min)** Añadir store de mesas con refresco y cancelación de ciclo
+  - Evidencia: specs `table.service.spec.ts` (3 casos HTTP: GET mesas, PATCH `/status` con `{status}`, GET `/tables/:id/orders`; campo histórico opcional). Rojo comprobado: cambiar `patch` por `put` en el servicio hace fallar el spec; con el servicio real pasa. `npm run test -w @resttek/web-empleados` verde.
+- [x] **T27 (10 min)** ~~Añadir store de mesas con refresco y cancelación de ciclo~~
   - Archivos: `packages/web-empleados/src/app/features/tables/store/table.store.ts`, `table.store.spec.ts` (nuevos).
   - Dependencias: T26.
   - Comprobación: carga inicial y polling de 30 s, un único intervalo, limpieza al destruir/cambiar restaurante; respuestas tardías descartadas, errores visibles sin falsos éxitos.
-- [ ] **T28 (10 min)** Mostrar en salón todas las mesas con sus estados
+  - Evidencia: `table.store.spec.ts` (14 casos, fake timers): carga inicial, polling 30 s con un único intervalo (también tras reiniciar), `stopPolling`, respuesta tardía de otro restaurante descartada, error visible sin vaciar mesas, PATCH sin actualizar antes del éxito, doble envío bloqueado, error de servidor, detalle por mesa/sesión (tardías descartadas, última petición gana, liberar limpia). Mutaciones que hacen fallar el spec: quitar la generación al cargar, no limpiar el intervalo, quitar el bloqueo de doble envío, quitar el contador de petición de detalle. `npm run test -w @resttek/web-empleados` verde (23 tests).
+- [x] **T28 (10 min)** ~~Mostrar en salón todas las mesas con sus estados~~
   - Archivos: `packages/web-empleados/src/app/features/orders/pages/salon/salon.component.{ts,html,css}`, `salon.component.spec.ts` (nuevo); componente presentacional de mesa dentro de `features/tables/` si se reutiliza.
   - Dependencias: T27.
   - Comprobación: libre/ocupada/reservada distinguibles con texto, número y capacidad; mesa ocupada sin pedidos muestra ese caso, no desaparece.
-- [ ] **T29 (10 min)** Incorporar cambio de estado con confirmación y errores
+  - Evidencia: `salon.component.spec.ts` (bloque T28): renderiza todas las mesas con «Mesa N», «Capacidad: N» y estado en texto (libre/ocupada/reservada), mesa ocupada sin pedidos visible, cargando/error/vacío explícitos, polling con restaurante del JWT y parada al destruir. Mutaciones comprobadas (no confirmar, quitar `disabled`, quitar etiqueta, quitar guarda de admin) hacen fallar el spec. Nota: salón, `TableOrdersComponent`, `table-label` y cambios de `OrderStore` van en este commit porque el salón los importa.
+- [x] **T29 (10 min)** ~~Incorporar cambio de estado con confirmación y errores~~
   - Archivos: salón y store de mesas con tests.
   - Dependencias: T28.
   - Comprobación: tres estados, confirmación al cerrar ocupación, bloquear doble envío; liberar con pedidos pendientes permitido y advertido; mostrar errores del servidor y no actualizar antes del éxito.
-- [ ] **T30 (10 min)** Añadir detalle de pedidos exclusivamente de la visita actual
+  - Evidencia: `salon.component.spec.ts` (bloque T29) + `table.store.spec.ts`: tres botones de estado con el actual marcado; `confirm` solo al cerrar ocupación (cancelar no llama al store); liberar con pendientes permitido, advertido y sin llamar a `updateItemStatus`; no actúa si mismo estado o mesa en actualización (botones `disabled`); PATCH sin actualizar antes del éxito, error del servidor visible. Limitación: el aviso de pendientes solo cuenta ítems si el detalle de esa mesa está abierto.
+- [x] **T30 (10 min)** ~~Añadir detalle de pedidos exclusivamente de la visita actual~~
   - Archivos: salón; `features/tables/components/table-orders/` (nuevo) y sus tests.
   - Dependencias: T28.
   - Comprobación: mostrar estados de todos los ítems incluidos entregados, distinguir pedidos múltiples y refrescar detalle; cambio de sesión/mesa descarta respuesta tardía y borra detalle anterior.
-- [ ] **T31 (10 min)** Mantener entregas y visibilidad de pedidos de visitas cerradas
+  - Evidencia: `table-orders.component.spec.ts` (pedidos separados «Pedido 1/2», todos los ítems incluidos entregados, vacío/cargando/error), bloque T30 de `salon.component.spec.ts` (ver pedidos solo en ocupadas, mesa sin visita) y `table.store.spec.ts` (cambio de mesa/sesión borra detalle y descarta respuesta tardía; última petición gana). El detalle usa solo `GET .../tables/:id/orders` (visita actual).
+- [x] **T31 (10 min)** ~~Mantener entregas y visibilidad de pedidos de visitas cerradas~~
   - Archivos: salón, `features/orders/models/order.model.ts`, modelos/templates de barra y cocina para etiquetas de mesa cuando proceda; tests de filtros.
   - Dependencias: T02, T29, T30.
   - Comprobación: sigue existiendo panel de ítems `listo` y acción entregar; pendientes antiguos siguen en cocina/barra, sin mezclarse con nueva visita; usar número visible en lugar de UUID cuando esté disponible, fallback para pedidos antiguos.
-- [ ] **T32 (10 min)** Resolver restaurante de admin sin ampliar acceso a cocina
+  - Evidencia: `cocina.component.spec.ts` y `barra.component.spec.ts` (número visible `tableNumber` en lugar de UUID, «Visita cerrada» solo con `tableSessionEndedAt`, fallback a `tableId` en pedidos históricos, sin etiqueta sin mesa), `table-label.spec.ts`, bloque T31 de `salon.component.spec.ts` (panel solo con ítems `listo` y acción entregar llama a `updateItemStatus(..., 'entregado')`) y `order.store.spec.ts` (sin intervalos duplicados, respuesta tardía descartada). Mutación comprobada: usar `order.tableId` en cocina hace fallar el spec. Los pedidos pendientes de visitas cerradas siguen en cocina/barra porque el filtro por estado/categoría no cambió.
+- [x] **T32 (10 min)** ~~Resolver restaurante de admin sin ampliar acceso a cocina~~
   - Archivos: salón, servicio de restaurantes local nuevo en `features/tables/services/`, tests; reutilizar guards existentes sin ampliar su matriz.
   - Dependencias: T28.
   - Comprobación: camarero/manager usan restaurante del JWT y no pueden seleccionar otro; admin sin asignación elige restaurante; cambio reinicia polling/detalle de mesas y pedidos; cocinero sigue sin salón.
-- [ ] **T33 (10 min)** Verificar empleados y transiciones con API real
+  - Evidencia: En esta base no existen los guards de `1/control-acceso-por-rol-web-empleados` (rama no integrada), así que se añadió `core/auth/salon-access.ts` (solo salón: camarero/manager/admin; cocinero redirigido a `/`). No se modificó la matriz de cocina/barra ni el menú de cocinero/camarero/manager; el único cambio de permisos es que admin entra a Salón (necesario por la API: admin opera mesas) y no ve cocina/barra. Al integrar esa rama habrá que unificar `salonGuard` con `employeeRoleGuard` (conflicto previsible en `app.routes.ts` y shell). Specs: `salon-access.spec.ts`, `app.routes.spec.ts` (solo salón con guarda; raíz→salón solo admin), `shell.component.spec.ts` (menús previos intactos; admin solo Salón; cocinero/camarero sin restaurante bloqueados), bloque T32 de `salon.component.spec.ts` (camarero/manager usan JWT y no pueden elegir; admin sin restaurante elige, cambio reinicia polling y limpia mesas/pedidos).
+- [x] **T33 (10 min)** ~~Verificar empleados y transiciones con API real~~
   - Archivos: specs de mesas/salón y este plan.
   - Dependencias: T17, T31, T32.
   - Comprobación: `npm run test -w @resttek/web-empleados` y `npm run build -w @resttek/web-empleados`; pruebas manuales de estados y pedido mixto comida/bebida conservando cocina/barra/entrega.
+  - Evidencia: `npm run test -w @resttek/web-empleados`: 11 archivos, 60 tests verdes. `npm run build -w @resttek/web-empleados` correcto. API real: worktree desacoplado de `21/gestion-mesas` (8dad5f6), `npm run seed`, `PORT=3012`; script Python con las peticiones exactas del servicio: listar mesas 200; PATCH de estado en ocupada→ocupada→reservada→libre (200) y ocupada→libre con pendiente (200); `GET /restaurants/:id/tables/:tableId/orders` con la visita actual; pedido mixto (principal + bebida, creado por cliente con sesión propia) visible en `GET /orders/active` con ambos ítems (cocina filtra no-bebida, barra bebida), preparando→listo→entregado por ítem (204), y tras liberar la mesa sigue activo y entregable con `tableSessionEndedAt`. NO se usó navegador: no se probó la interfaz renderizada contra la API; solo las peticiones del servicio y specs de componentes. API y worktree temporal detenidos y eliminados.
 
 ### D. Clientes — agente Frontend Angular, alcance web-clientes
 
 Propiedad: `packages/web-clientes/**`; solo este agente modifica dependencias/configuración de tests de ese paquete. No importar código de admin/empleados.
 
-- [ ] **T34 (10 min)** Habilitar pruebas unitarias usando el patrón Angular del monorepo
+- [x] **T34 (10 min)** ~~Habilitar pruebas unitarias usando el patrón Angular del monorepo~~
   - Archivos: `packages/web-clientes/package.json`, `angular.json`, `tsconfig.spec.json` (nuevo); `package-lock.json` en raíz.
   - Dependencias: ninguna.
   - Comprobación: script `test` y target `@angular/build:unit-test` con Vitest; añadir únicamente dependencias de pruebas necesarias, compatibles con el paquete. Tras editar manifiesto ejecutar `npm install` desde raíz; smoke test rojo/verde ejecutable. El comando de tests de clientes pasa a existir en este paso.
-- [ ] **T35 (10 min)** Añadir tipos y servicio HTTP de disponibilidad/ocupación
+  - Evidencia: rojo: `npm run test -w @resttek/web-clientes` con `smoke.spec.ts` falló por `Missing script: "test"`. Verde: añadidos script `test`, target `@angular/build:unit-test` (Vitest) y devDependencies `vitest`/`jsdom` con las mismas versiones que web-admin; `tsconfig.spec.json` ya existía con `vitest/globals`. Tras `npm install`, 1 test pasa.
+- [x] **T35 (10 min)** ~~Añadir tipos y servicio HTTP de disponibilidad/ocupación~~
   - Archivos: `packages/web-clientes/src/app/core/models/table.model.ts`, `services/table.service.ts`, `services/table.service.spec.ts` (nuevos).
   - Dependencias: T01, T34.
   - Comprobación: GET con grupo, POST solo al continuar, GET current con sesión o null, errores 409 propagados; nunca enviar clientId.
-- [ ] **T36 (10 min)** Mantener y recuperar contexto de ocupación desde servidor
+  - Evidencia: contrato `tables.openapi.yaml` (propuesto, aún no implementado en la API; solo lectura, no incluido en commits frontend). Rojo: `table.service.spec.ts` no compilaba al no existir `TableService`. Verde: `npm run test -w @resttek/web-clientes` 9 tests; cubre GET con `partySize`, POST solo `{tableId, partySize}` (sin `clientId`), 201 y 200 idempotente, `current` con sesión, literal `null`/cuerpo sin sesión → `null`, 409 propagado con su cuerpo.
+- [x] **T36 (10 min)** ~~Mantener y recuperar contexto de ocupación desde servidor~~
   - Archivos: `packages/web-clientes/src/app/core/store/table-session.store.ts`, `table-session.store.spec.ts` (nuevos).
   - Dependencias: T35.
   - Comprobación: signals de sesión/mesa/carga/error, recuperación por restaurante, no mezclar respuestas A/B; recarga reconstruye desde API sin confiar en datos locales. Salir/cambiar restaurante no llama a liberar.
-- [ ] **T37 (10 min)** Crear paso de número de personas y listado elegible
-  - Archivos: `packages/web-clientes/src/app/features/tables/table-selection.component.{ts,html,css,spec.ts}` (nuevos).
+  - Evidencia: rojo: specs no compilaban (`api-error` y `table-session.store` inexistentes). Verde: 30 tests. `TableSessionStore` (solo memoria, sin persistencia) expone `occupation/session/table/sessionId/partySize/loading/error`, `load()` descarta respuestas y errores de peticiones superadas (A/B), cambiar de restaurante descarta la ocupación anterior, la ocupación se oculta si cambia el usuario y no existe operación de liberación. Se añade `core/models/api-error.ts` (+spec) para tratar ambos formatos de error (`{error,message}` y `{error}` heredado) y los códigos de sesión/mesa explícitamente. Incertidumbre documentada: el contrato marca como "a confirmar" el formato exacto del 400 por sesión ausente; el parser admite ambos formatos y reconoce los mensajes literales conocidos.
+- [x] **T37 (10 min)** ~~Crear paso de número de personas y listado elegible~~
+  - Archivos: `packages/web-clientes/src/app/features/tables/table-selection.page.{ts,html,css,spec.ts}` (nuevos). Es una pantalla asociada a ruta: se nombra `TableSelectionPage` / `*.page.*` según la convención de pages (corrige el sufijo `.component` del plan original).
   - Dependencias: T35, T36.
   - Comprobación: grupo entero positivo obligatorio, mesas suficientes, lista vacía/carga/error; cambiar grupo invalida selección anterior y descarta respuestas tardías de otra cantidad.
-- [ ] **T38 (10 min)** Confirmar ocupación y tratar conflictos sin navegar
+  - Evidencia: rojo: el spec de la page no compilaba (page inexistente). Verde: 46 tests; grupo `''`, `0`, `-1`, `2.5`, `abc`, `1e2` rechazado sin llamar a la API; listado, carga, vacío y error con reintento; seleccionar no llama a ocupar; cambiar grupo borra lista/selección y descarta respuestas tardías (también si no se vuelve a buscar). Si ya hay ocupación propia se muestra su mesa con acceso a la carta en lugar del formulario. La ruta se registra en T39.
+- [x] **T38 (10 min)** ~~Confirmar ocupación y tratar conflictos sin navegar~~
   - Archivos: selección de T37 y sus tests.
   - Dependencias: T37.
   - Comprobación: seleccionar no muta estado; continuar sin selección bloqueado; una petición mientras guarda; 201/200 guarda sesión y navega a carta, 409 muestra aviso y refresca/reconcilia sin elegir otra mesa automáticamente.
-- [ ] **T39 (10 min)** Conectar listado, rutas y acceso directo a carta
+  - Evidencia: rojo: `confirm`/`saving` inexistentes (errores TS2339 en el spec). Verde: 53 tests; continuar bloqueado sin selección, 201/200 guardan sesión y navegan a `/restaurants/:id`, doble clic = una sola petición, 409 (formato nuevo y heredado) avisa sin navegar, reconcilia con `GET current` y refresca la lista sin elegir mesa; `ActiveTableSessionExistsError` muestra la sesión existente; fallo de red conserva la selección para reintentar.
+- [x] **T39 (10 min)** ~~Conectar listado, rutas y acceso directo a carta~~
   - Archivos: `packages/web-clientes/src/app/app.routes.ts`, `features/restaurants/restaurant-list.component.ts`, `core/guards/table-session.guard.ts` (nuevo), specs de rutas/guard.
   - Dependencias: T38.
   - Comprobación: restaurante lleva a `restaurants/:id/tables`; conservar carta en `restaurants/:id`; guard consulta sesión propia y redirige al paso de mesas si no existe, sin bucles. Con sesión existente volver al restaurante permite continuar a su carta sin ocupar de nuevo.
-- [ ] **T40 (10 min)** Vincular carrito y carta a la ocupación activa
+  - Evidencia: rojo: specs de guard/rutas/listado no compilaban (guard inexistente). Verde: 61 tests; `tableSessionGuard` consulta siempre al servidor (true con sesión, `UrlTree` a `/restaurants/:id/tables` con `null` o error), `restaurants/:id/tables` carga `TableSelectionPage` sin guard (sin bucles), `restaurants/:id` conserva la carta con guard, el listado enlaza a `/restaurants/:id/tables`. Con sesión existente, la page de mesas ofrece continuar a la carta sin ocupar de nuevo (T38).
+- [x] **T40 (10 min)** ~~Vincular carrito y carta a la ocupación activa~~
   - Archivos: `packages/web-clientes/src/app/core/store/cart.store.ts`, `cart.store.spec.ts` (nuevo), `features/menu/restaurant-menu.component.ts`, `features/cart/cart.component.ts`.
   - Dependencias: T36, T39.
   - Comprobación: mostrar número y grupo; carrito vinculado a restaurante y sessionId; al cambiar de visita no reutiliza productos de la anterior, aunque sea el mismo restaurante. Vaciar carrito tras pedido no borra la sesión.
-- [ ] **T41 (10 min)** Enviar pedido con mesa/sesión y manejar sesión cerrada
+  - Evidencia: rojo: `cart.store.spec.ts` no compilaba (`bindSession`/`reset`/`sessionId` inexistentes). Verde: 73 tests; `CartStore.bindSession` vincula restaurante+sesión y vacía productos si cambia la sesión (misma mesa/restaurante incluida) o el restaurante; `clear()` conserva la vinculación; `reset()` la descarta; la carta muestra `Mesa N · X personas` y vincula el carrito al abrirse. La presentación de mesa/grupo en `cart.component.ts` se añade en T41 junto a sus tests.
+- [x] **T41 (10 min)** ~~Enviar pedido con mesa/sesión y manejar sesión cerrada~~
   - Archivos: `packages/web-clientes/src/app/core/services/order.service.ts`, `core/models/order.model.ts`, `features/cart/cart.component.ts`, specs nuevos.
   - Dependencias: T02, T40.
   - Comprobación: payload lleva ids correctos y sin clientId; éxito conserva navegación a pedido; error de sesión comunica el motivo y devuelve al flujo de selección sin enviar automáticamente el carrito a otra mesa; fallo de red conserva productos para reintento.
-- [ ] **T42 (10 min)** Revalidar ocupación al volver y mantener pedidos históricos
+  - Evidencia: rojo: specs de `OrderService`/carrito no compilaban (firma `createOrder` antigua). Verde: 88 tests; payload `{restaurantId, tableId, tableSessionId, items}` sin `clientId`; éxito conserva `/orders/:id`; doble clic = un envío; `TableSessionRequired/Forbidden/NotFound/ClosedError` (formato nuevo y mensaje heredado) comunican el motivo, limpian la ocupación local, `reset()` del carrito y navegan a `/restaurants/:id/tables` (aviso por `history.state`, mostrado por la page) sin reenviar; fallo de red/otros errores conservan productos y permiten reintentar; el modelo `Order` tolera ausencia/null de `tableSessionId`, `tableNumber`, `tableSessionEndedAt`. Incertidumbre real documentada: el contrato de pedidos marca "a confirmar" el formato del 400 y los 403/404/409 de sesión siguen PENDIENTES de implementar en la API; un 403/404 sin código de sesión reconocible (p. ej. `{error:'Forbidden: ...'}` del middleware) se trata como error genérico y conserva el carrito.
+- [x] **T42 (10 min)** ~~Revalidar ocupación al volver y mantener pedidos históricos~~
   - Archivos: store/guard de sesión, carta/carrito y sus tests; `features/orders/my-orders.component.ts`, `order-detail.component.ts` solo si requieren presentación de mesa.
   - Dependencias: T41.
   - Comprobación: volver/recargar con sesión abierta recupera la misma; liberada o borrada no permite añadir/enviar usando contexto obsoleto; logout/otro usuario no hereda contexto local. Mis pedidos y detalle siguen mostrando pedidos previos.
-- [ ] **T43 (10 min)** Cubrir recorrido de selección, doble clic y visita nueva
+  - Evidencia: rojo: specs no compilaban (`TableSessionStore.revalidate` inexistente). Verde: 108 tests. `revalidate()` devuelve `valid`/`closed`/`unknown` (null u otra sesión = closed; error de red = unknown, el servidor valida al enviar). Carrito (al abrirse y al volver a la pestaña) y carta (al volver a la pestaña) reconsultan al servidor; con `closed` hacen `clear`+`reset` y vuelven a selección con aviso; `addToCart` sin ocupación vigente no añade. `CartStore` se vacía al hacer logout o cambiar de usuario (effect sobre `AuthStore.user().id`, sin reset en la primera ejecución). Mis pedidos y detalle muestran `Mesa N` y `Ocupación anterior` (si `tableSessionEndedAt`), y siguen mostrando pedidos históricos sin esos campos o con null. No verificado en navegador: el comportamiento real de `visibilitychange` solo está cubierto con eventos simulados en jsdom.
+- [x] **T43 (10 min)** ~~Cubrir recorrido de selección, doble clic y visita nueva~~
   - Archivos: specs de selección, guard, sesión y carrito.
   - Dependencias: T42.
   - Comprobación: escenarios de capacidad exacta/sobrante, 0/decimal, ausencia de mesas, dos clientes compitiendo, doble clic y segunda visita sin carrito de la primera.
-- [ ] **T44 (5 min)** Validar clientes con el backend integrado
+  - Evidencia: tarea de cobertura: no hay rojo porque T36–T42 ya implementaban el comportamiento; se añadieron tests que pasan desde el inicio (112 tests en total). Nuevo `features/tables/table-visit-flow.spec.ts`: capacidad exacta, capacidad sobrante, ausencia de mesas (sin continuar) y segunda visita sin carrito de la primera. Ya cubiertos en specs previos: grupo `''`/`0`/`-1`/`2.5`/`abc`/`1e2` (page), dos clientes compitiendo = 409 mesa no disponible o sesión activa (T38), doble clic = una llamada.
+- [x] **T44 (5 min)** ~~Validar clientes con el backend integrado~~
   - Archivos: este plan.
   - Dependencias: T17, T43.
   - Comprobación: `npm run test -w @resttek/web-clientes` (disponible tras T34), `npm run build -w @resttek/web-clientes`; navegador con recarga y retorno desde otro restaurante confirma recuperación sin liberación automática.
+  - Evidencia: `npm run test -w @resttek/web-clientes` 113/113 en 15 ficheros y `npm run build -w @resttek/web-clientes` correcto. Desajuste hallado y corregido con TDD (rojo: caso `TableSessionMismatchError` no navegaba): el 400 `TableSessionMismatchError` de `POST /orders` (sesión incoherente con restaurante/mesa) se trataba como error genérico; ahora se trata como sesión no válida (aviso, `clear` + `reset`, vuelta a selección). Servicio, store, guard y paths/cuerpos coinciden con `tables.openapi.yaml` y `orders.openapi.yaml` de `21/gestion-mesas` (disponibilidad `GET .../tables/available?partySize=`, `POST .../table-sessions` `{tableId, partySize}`, `GET .../table-sessions/current` con literal `null`).
+  - Validación con API real SIN NAVEGADOR: API de `21/gestion-mesas` (commit 9cc7205) en un worktree desacoplado temporal, BD propia con `npm run seed`, puerto 3013 (worktree y proceso retirados al acabar). Se reprodujo con un script Python (urllib) la secuencia de peticiones que hace el cliente, con JWT reales de cliente1/cliente2/camarero1: current inicial 200 `null`; disponibilidad grupo 2 (200, sin ocupar al repetir; `0`, `2.5`, `abc` -> 400 `InvalidPartySizeError`); ocupar 201; reintento mismo cliente/mesa/grupo 200 con la misma sesión; otro cliente misma mesa 409 `TableNotAvailableError`; mismo cliente otra mesa 409 `ActiveTableSessionExistsError`; "recarga" (current devuelve la sesión); la mesa deja de listarse; current en otro restaurante `null` y al volver a R1 la misma sesión sin liberar; cliente2 no ve la sesión ajena (`null`); pedido con sesión 201; sin sesión 400 `TableSessionRequiredError`; sesión ajena 403 `TableSessionForbiddenError`; inexistente 404 `TableSessionNotFoundError`; restaurante o mesa incoherentes 400 `TableSessionMismatchError`; camarero libera -> pedido 409 `TableSessionClosedError`, current `null`, el pedido previo sigue en `/orders/mine` con `tableNumber` y `tableSessionEndedAt`; nueva visita en la misma mesa 201 con sesión distinta. Todos con cuerpo `{error, message}` coincidente con el parseo del cliente.
+  - NO verificado: navegador real (recarga, retorno desde otro restaurante, `visibilitychange` real); solo cubierto por specs jsdom y por las peticiones HTTP reproducidas. Nota de diseño: ante errores de sesión el carrito se vacía (`reset`) para no reenviarlo a otra mesa (T41/CA15); el 400 heredado `Restaurant ID is required` y los fallos de red/500 conservan los productos.
 
 ### E. Integración y documentación — agente coordinador
 
 Propiedad: documentación general y seguimiento final. No utilizar esta fase para ocultar tareas de implementación incompletas.
+
+> **Integración (2026-10-30).** Fusionadas en `21/gestion-mesas`: `master` (control de acceso por rol de web-empleados, OpenAPI de platos/empleados/ingredientes y corrección de `seed.ts`), `21/gestion-mesas-admin`, `21/gestion-mesas-clientes` y `21/gestion-mesas-empleados`, con un merge por rama.
+> - `seed.ts`: master y la API corrigieron por separado el orden restaurantes→empleados y quedaron los restaurantes insertados dos veces; se elimina el duplicado (`fix(api)`). Seed ejecutado dos veces en una BD temporal (eliminada después): 2 restaurantes, 8 mesas y 1 sesión abierta, sin duplicados.
+> - Control de acceso de web-empleados: se elimina `core/auth/salon-access.ts` (`salonGuard`/`canAccessSalon`) del bloque C y salón usa el `employeeRoleGuard`/`canAccessView` de master, cuya matriz ya excluye a cocinero. Rutas, `app.routes.spec.ts` y `shell.component.spec.ts` toman la versión de master. Del bloque C se conserva `canEnter` en el shell (admin sin restaurante entra para elegirlo en salón), cubierto con un caso nuevo en `shell.component.spec.ts`. Cambio de comportamiento respecto al bloque C: admin ve cocina, barra y salón según la matriz de master (sin restaurante, cocina y barra no cargan pedidos), no solo salón; y la raíz redirige según `getInitialRoute`. Lo anotado en T32 y en la evidencia de CA09 sobre `salonGuard` y «admin solo salón» queda sustituido por esto.
+> - Plan: se unifican las cuatro copias; la base es la de la API y se toman los bloques B, C y D y las evidencias de CA de cada rama.
+> - Validación tras integrar: `npm test` 25 archivos / 307 tests; `tsc --noEmit` exit 0; web-admin 87 tests y build OK; web-empleados 135 tests (60 de mesas + los de control de acceso de master) y build OK; web-clientes 113 tests y build OK. Sin navegador.
 
 - [ ] **T45 (10 min)** Actualizar modelo de datos, glosario y arquitectura de API
   - Archivos: `docs/dominio/modelo-datos.md`, `docs/dominio/glosario.md`, `docs/arquitectura/arquitectura-api.md`.
@@ -372,7 +410,7 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
 
 - [ ] **CA01 — CRUD por restaurante.** Admin crea, lista, edita y borra mesas con sus cinco campos; el id permanece estable al editar.
   - Verificación: tests HTTP y admin; navegador en dos restaurantes, editar descripción/capacidad/estado y comprobar persistencia tras recarga.
-  - Evidencia: pendiente.
+  - Evidencia parcial (solo admin, API real por curl + tests de componente; no marcado porque falta la verificación en navegador y de las demás apps): alta/edición/borrado correctos y id estable al editar (ver T25).
 - [ ] **CA02 — Validación y unicidad.** Número/capacidad/grupo son enteros positivos; los estados válidos son exactamente tres; número duplicado solo se prohíbe entre mesas activas del mismo restaurante.
   - Verificación: matriz 0, -1, 1.5, strings/null/ausente y estado desconocido; mismo número en otro restaurante permitido; duplicado activo 409; capacidad exacta al grupo admitida.
   - Evidencia: Evidencia parcial (solo API): `npx vitest run src/routes/acceptance` (`CA02`) 14 cuerpos inválidos (0, -1, 1.5, string, null, ausente en número/capacidad; estado desconocido/mayúsculas) → 400 `{error,message}`; los tres estados válidos aceptados; mismo número en otro restaurante 201; duplicado activo 409 `TableNumberConflictError`; número reutilizable tras borrar; capacidad igual al grupo admitida. Complementa `src/models` (57 tests) y `database.test.ts`. Al ser solo API, el CA no depende de navegador: **completo en API**.
@@ -382,48 +420,56 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
 - [ ] **CA04 — Momento de ocupación.** Indicar grupo/listar/seleccionar no ocupa; continuar con éxito abre una sesión, marca ocupada y lleva a carta.
   - Verificación: consultar mesa antes y después; test HTTP y componente con spy del POST; continuar inválido no llama API.
   - Evidencia: Evidencia parcial (API): test `CA04`: consultar disponibilidad dos veces y `current` no ocupan (mesa `libre`, `activeSessionId` null); `partySize: 0` → 400 sin cambios; confirmar → 201, mesa `ocupada` con `activeSessionId` de la sesión y desaparece de disponibilidad. Falta el spy del POST en componente y la navegación a carta (bloque D).
+  - Evidencia parcial (solo parte clientes, NO marcado): listar/seleccionar no ocupa (API real: disponibilidad repetida no cambia estado; specs: seleccionar no llama a ocupar); continuar abre sesión 201 y navega a la carta (spec). Sin navegador.
 - [ ] **CA05 — Conflicto concurrente y reintento.** Dos clientes no consiguen ocupar la misma mesa; reintentar el ganador no duplica sesión y un fallo no deja estado parcial.
   - Verificación: dos peticiones concurrentes, una creación y un conflicto; contar una sesión abierta, repetir confirmación y comprobar mismo id; inyectar fallo y comprobar rollback.
   - Evidencia: Evidencia (API): `table-session.repository.test.ts` (T07): dos clientes por una mesa → 1 ganador + 1 `TableNotAvailableError`; 10 simultáneos → 1 sesión abierta; reintento del ganador → `created:false` con el mismo id; fallos inyectados (INSERT duplicado, `disk I/O error` tras el UPDATE) → rollback con mesa libre y sin sesión huérfana; HTTP: 201 y 200 del reintento en `table-session.routes.test.ts`. Comprobado en `npm test` 307/307. **Completo (API)**.
 - [ ] **CA06 — Recuperación sin liberación automática.** Recargar, salir o cambiar restaurante conserva sesión en servidor y al volver se recupera la mesa.
   - Verificación: navegador con recarga completa y vuelta desde otro restaurante; GET current devuelve misma sesión; ninguna petición de liberación desde cliente.
-  - Evidencia: pendiente.
+  - Evidencia parcial (solo parte clientes, NO marcado): API real: current devuelve la misma sesión tras "recarga" y tras consultar otro restaurante y volver, sin liberación; el guard/store reconsultan al servidor (specs). Sin navegador.
 - [ ] **CA07 — Acceso directo y contexto obsoleto.** No se puede pedir sin sesión propia abierta ni usar sesión cerrada, borrada, ajena o de otro restaurante.
   - Verificación: URL directa a carta sin sesión redirige; POST manipulado devuelve error; liberar desde empleados y volver a cliente impide pedido; cubrir carrera entre cierre y creación.
   - Evidencia: Evidencia parcial (API): `order.routes.test.ts`: sin sesión 400, inexistente 404, ajena 403, restaurante/mesa distintos 400, cerrada 409 sin crear pedido; sesión de mesa borrada 409; carrera liberar vs pedir (cada pedido 201 o 409, ninguno posterior al cierre); `order.repository.test.ts` T12 con SQLite real. Falta la redirección de URL directa a carta y el recorrido liberar→volver en navegador (bloques C/D).
+  - Evidencia parcial (solo parte clientes, NO marcado): API real: pedido sin sesión 400, ajena 403, inexistente 404, incoherente 400, cerrada 409 y el cliente vuelve a selección sin reenviar (specs). Sin navegador; faltan sesión borrada y de otro restaurante en caso de borrado de mesa (admin).
 - [ ] **CA08 — Envío a cocina y barra.** Nuevo pedido guarda mesa/sesión correctas; comida aparece en cocina y bebida en barra, conservando estados por unidad.
   - Verificación: pedido con 2 comidas y 1 bebida produce tres ítems `pendiente`; preparar/listo/entregar desde las apps sin pérdidas.
   - Evidencia: pendiente.
 - [ ] **CA09 — Estados visibles y editables por personal autorizado.** Salón muestra todas las mesas, incluso ocupadas sin pedidos, y permite los tres estados.
   - Verificación: navegador como camarero, manager y admin; cambio persistente tras recarga; cocinero continúa en cocina sin acceso a salón.
-  - Evidencia: pendiente.
+  - Evidencia (parte empleados, sin marcar el CA): specs de salón (todas las mesas con estado, capacidad y número en texto; ocupada sin pedidos visible; tres botones), de shell y de rutas (cocinero sin salón, admin solo salón). Con API real (curl con las mismas rutas del servicio, JWT de camarero1): `GET /restaurants/rest-1/tables` 200 con 5 mesas; `PATCH .../status` ocupada/ocupada/reservada/libre 200 con `activeSessionId` coherente; cocinero1 recibe 403 en GET y PATCH de mesas; camarero de rest-1 sobre rest-2 403; estado inválido 400. NO se probó en navegador ni la persistencia tras recarga en UI, ni manager/admin en UI (admin: `GET /restaurants` y `GET /restaurants/rest-2/tables` 200).
 - [ ] **CA10 — Visita actual aislada.** Mesa ocupada muestra sus pedidos/estados, incluidos entregados, pero no los de sesiones anteriores.
   - Verificación: sesiones A y B sucesivas de una mesa con pedidos en ambas; detalle B solo contiene ids de B; ocupada manual sin pedidos muestra vacío.
   - Evidencia: Evidencia parcial (API): T16 (sesiones A y B sucesivas: detalle de B sin pedidos de A, entregados incluidos en `order.repository.test.ts`) y test `CA17` de `acceptance.routes.test.ts` (ocupada manual sin pedidos → `[]`). Falta verlo en el salón (bloque C).
+  - Evidencia (parte empleados, sin marcar el CA): spec de `TableStore`/`TableOrdersComponent`/salón: detalle solo de la sesión activa, borrado y descarte de respuestas tardías al cambiar de mesa/sesión. API real: tras una visita de cliente con pedido mixto, `GET .../tables/:id/orders` devolvió ese pedido con `tableNumber` y `tableSessionEndedAt: null`, y `[]` tras liberar la mesa. NO se probó la secuencia de dos visitas A y B con pedidos en ambas ni el navegador.
 - [ ] **CA11 — Liberación con pendientes.** Se permite liberar con pedidos pendientes sin cancelarlos, entregarlos ni mostrarlos en la siguiente visita.
   - Verificación: liberar A pendiente, ocupar B y comprobar que A sigue en cocina/barra/panel de entregas identificado como anterior; nueva petición de A se rechaza.
   - Evidencia: Evidencia parcial (API): T16 `order.routes.test.ts`: liberar A con pendientes, ocupar B; A sigue en `/orders/active` con `tableSessionEndedAt`/`tableNumber`, procesable por cocina (204), y su nueva petición se rechaza 409; la mesa de B no lista pedidos de A. Falta comprobar cocina/barra/panel de entregas en empleados (bloque C).
+  - Evidencia (parte empleados, sin marcar el CA): spec de salón: confirmación al cerrar ocupación con aviso de pendientes y sin cancelar ni entregar; API real: `PATCH ocupada->libre` con un ítem `listo` sin entregar devolvió 200, `GET /orders/active` siguió devolviendo el pedido con `tableSessionEndedAt` no nulo (la UI lo etiqueta «Visita cerrada» en cocina/barra/entregas, comprobado por specs) y el ítem pudo entregarse después (204). NO se probó ocupar B después ni el rechazo de nuevas peticiones de A, ni navegador.
 - [ ] **CA12 — Historial tras borrado.** Borrar oculta la mesa, cierra su ocupación y conserva sesiones, pedidos e ítems históricos.
   - Verificación: consulta de pedido anterior sigue funcionando; disponibilidad/listados no incluyen mesa; recrear mismo número obtiene id nuevo y no hereda pedidos.
   - Evidencia: Evidencia (API): T16 (borrado 204, mesa 404, sesión cerrada conservada, pedido e ítems conservados) y test `CA12` de `acceptance.routes.test.ts`: tras borrar, listado y disponibilidad vacíos; recrear el número da id nuevo, su detalle de pedidos es `[]` y el pedido antiguo conserva `tableId`/`tableSessionId` originales. **Completo (API)**.
 - [ ] **CA13 — Autorización y pertenencia.** Solo admin dispone de CRUD; manager/camarero solo cambian mesas de su restaurante; cliente solo opera su ocupación.
   - Verificación: matriz HTTP por rol/restaurante, sin JWT y con ids cruzados; 401/403/404 según contrato; manager bloqueado en URL de CRUD admin; disponibilidad sin datos personales.
   - Evidencia: Evidencia (API): `table.routes.test.ts` y `table-session.routes.test.ts` (T15, 40 pruebas HTTP): solo admin CRUD (manager/camarero/cocinero/cliente 403), manager/camarero de otro restaurante 403, ids cruzados 404 incluso para admin, sin JWT/token inválido 401, personal sin acceso a disponibilidad/ocupación, disponibilidad sin identidad ni estado. Mutación temporal documentada en T15. Falta el bloqueo por URL directa del manager en admin (bloque B), por lo que el CA queda **completo en API, parcial global**.
+  - Evidencia parcial (solo admin; no marcado): rutas `restaurants/:restaurantId/tables` con `adminGuard` (comprobado en `tables.routes.spec.ts`; manager bloqueado en URL por el guard, sin prueba en navegador) y API real devuelve 403 al manager en POST. Falta camarero/cliente y las demás apps.
 - [ ] **CA14 — Compatibilidad de datos existentes.** Inicializar una BD anterior añade esquema sin borrar datos y pedidos sin sesión siguen consultables/preparables/entregables.
   - Verificación: fixture del esquema previo, evolución y segunda inicialización; comparar ids/ítems antes/después; pruebas de listados antiguos y panel de entregas.
   - Evidencia: Evidencia parcial (API): `database.test.ts` (T05): fixture del esquema previo, columna añadida una vez con `PRAGMA table_info`, ids/ítems intactos y reapertura sin repetir; test `CA14` de `acceptance.routes.test.ts`: pedido sin sesión (`mesa-7`) aparece en `/orders/active` con campos de sesión `null`, avanza `preparando→listo→entregado` (204), `mine` y `GET /:id` lo devuelven y sale de activos al entregarse. Falta el panel de entregas en empleados (bloque C).
 - [ ] **CA15 — Carrito y usuario aislados.** Carrito de otra visita/restaurante no se envía en la nueva; enviar un pedido no pierde la ocupación; otro usuario no hereda sesión local.
   - Verificación: tests de store y recorrido cambiar restaurante/visita, confirmar y pedir de nuevo; logout/login con usuario distinto.
-  - Evidencia: pendiente.
+  - Evidencia parcial (solo parte clientes, NO marcado): specs: carrito ligado a restaurante+sesión, nueva visita sin productos previos, enviar pedido conserva la ocupación, logout/otro usuario vacía contexto. Sin navegador.
 - [ ] **CA16 — Errores y refresco fiables.** Carga/error/vacío tienen presentación explícita; fallos no simulan éxito; las respuestas tardías no cruzan restaurante, grupo ni visita.
   - Verificación: tests con respuestas HTTP invertidas, 409 y fallo de red en cada app; timers de empleados se detienen al salir y no se duplican al volver.
-  - Evidencia: pendiente.
+  - Evidencia parcial (solo admin; no marcado): carga/error/vacío del listado y del formulario, error de borrado sin simular éxito y descarte de respuestas tardías entre restaurantes cubiertos por tests (T20, T24). Falta empleados/clientes.
+  - Evidencia (parte empleados, sin marcar el CA): specs de `TableStore` (respuestas tardías de restaurante/mesa/sesión, error sin vaciar lista ni simular éxito, doble envío, un solo intervalo y parada al destruir), `OrderStore` y salón (cargando/error/vacío explícitos). Fallos de red/409 reales no se provocaron contra la API (solo 400/403). Parte de otras apps pendiente.
+  - Evidencia parcial (solo parte clientes, NO marcado): specs: carga/vacío/error con reintento y descarte de respuestas tardías por grupo y restaurante; errores no simulan éxito. Sin navegador.
 - [ ] **CA17 — Capacidad y cambios administrativos coherentes.** No se reduce capacidad por debajo del grupo activo; PUT, PATCH y borrado mantienen el ciclo de sesiones.
   - Verificación: grupo 4, intentar capacidad 2 devuelve 409; capacidad 4 válida; cambiar ocupada a reservada cierra sesión; repetir ocupada no abre otra.
   - Evidencia: Evidencia (API): test `CA17` de `acceptance.routes.test.ts`: grupo 4 en mesa de 6, PUT capacidad 2 → 409 `TableCapacityConflictError`, capacidad 4 → 200; repetir `ocupada` mantiene una sola sesión; `ocupada→reservada` cierra la sesión (`activeSessionId` null, `current` null); `reservada→ocupada` manual abre otra sin pedidos. Borrado: T08/T16. **Completo (API)**; los avisos en admin/empleados corresponden a B/C.
+  - Evidencia parcial (solo admin; no marcado): API real devuelve 409 `TableCapacityConflictError` al bajar la capacidad bajo el grupo activo (5 personas), conserva la mesa; borrado de mesa ocupada por cliente → 204 y luego 404; el formulario muestra mensaje específico (T22). Probado por curl, no en navegador.
 - [ ] **CA18 — Validación técnica y documentación.** Tests, tipos y builds afectados pasan; documentación describe el flujo real.
   - Verificación: `npm test`; `npm exec -w @resttek/api -- tsc --noEmit -p tsconfig.json`; `npm run test -w @resttek/web-admin`; `npm run test -w @resttek/web-empleados`; `npm run test -w @resttek/web-clientes` tras T34; build de cada una de las tres apps; revisión de enlaces y recorrido documentado.
-  - Evidencia: pendiente.
+  - Evidencia parcial (integración 2026-10-30, sin marcar): todas las suites, `tsc` y los tres builds pasan en `21/gestion-mesas` (ver nota de integración en el bloque E). Falta la documentación de T45–T46.
 
 ## Reglas de seguimiento y finalización
 
