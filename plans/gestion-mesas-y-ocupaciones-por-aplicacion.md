@@ -366,10 +366,11 @@ Propiedad: documentación general y seguimiento final. No utilizar esta fase par
   - Dependencias: T17.
   - Comprobación: ER incluye mesas/sesiones y relación con pedidos, borrado lógico, transiciones y migración sin borrar BD; enlazar OpenAPI, no duplicarlo.
   - Evidencia: `modelo-datos.md` incluye en el ER `restaurant_tables` y `table_sessions` y su relación con `orders.table_session_id`, tablas con restricciones (índices únicos parciales y CHECK), borrado lógico, ciclo de transiciones, campos calculados de lectura y sección «Evolución del esquema» (`addColumnIfMissing` con `PRAGMA table_info`, sin borrar `resttek.db`), que sustituye la nota antigua de «borrar y volver a sembrar». `glosario.md`: entidades mesa y ocupación, estados de mesa, regla de pedido dentro de la ocupación y permisos de mesas. `arquitectura-api.md`: dominio `table` por capas, tabla de endpoints de mesas y ocupaciones, reglas de `POST /orders` para clientes, mapa de errores 401/403/404/409 actualizado, `transaction()` y cola exclusiva, y tests HTTP con supertest (sustituye el «no hay tests HTTP»). Enlaza `tables.openapi.yaml` y `orders.openapi.yaml` sin duplicar sus ejemplos. Afirmaciones contrastadas con `database.ts`, `errorHandler.ts`, `order.controller.ts`, `order.repository.ts` (`createInSession` en transacción) y las rutas. Enlaces relativos y anclas comprobados.
-- [ ] **T46 (10 min)** Documentar recorrido y organización frontend por aplicación
+- [x] **T46 (10 min)** ~~Documentar recorrido y organización frontend por aplicación~~
   - Archivos: `README.md`, `docs/arquitectura/arquitectura-frontend.md`.
   - Dependencias: T25, T33, T44.
   - Comprobación: guía admin CRUD, cliente grupo→mesa→carta, salón/visitas, pruebas por workspace; explicar reserva manual, recuperación y pedidos pendientes al liberar.
+  - Evidencia: `README.md`: recorrido admin con CRUD de mesas, cliente grupo→mesa→carta con recuperación sin liberación, salón con estados y visita actual, notas de reserva manual y liberación con pendientes, mesas del seed, admin en web-empleados y comandos de tests de los tres frontends. `arquitectura-frontend.md`: nueva estructura de `web-clientes`, tabla «Mesas en cada aplicación», `TableStore` con polling y descarte de respuestas tardías, `CartStore`/`TableSessionStore` (servidor como fuente de verdad, ocupación ligada al usuario), rutas y `tableSessionGuard` sin bucles, tratamiento de errores de ocupación en el carrito, `canEnter` de admin en el shell de empleados y «Pruebas por aplicación». Contrastado con `app.routes.ts` de admin y clientes, `table-session.guard.ts`, `cart.store.ts`, `table-session.store.ts` y los `package.json` (jsdom en los tres). Enlaces comprobados. Sin recorrido en navegador: es T47.
 - [ ] **T47 (10 min)** Ejecutar aceptación cruzada y cerrar evidencias del plan
   - Archivos: este plan; sin cambios de código previstos.
   - Dependencias: T45, T46.
@@ -470,7 +471,7 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Evidencia parcial (solo admin; no marcado): API real devuelve 409 `TableCapacityConflictError` al bajar la capacidad bajo el grupo activo (5 personas), conserva la mesa; borrado de mesa ocupada por cliente → 204 y luego 404; el formulario muestra mensaje específico (T22). Probado por curl, no en navegador.
 - [ ] **CA18 — Validación técnica y documentación.** Tests, tipos y builds afectados pasan; documentación describe el flujo real.
   - Verificación: `npm test`; `npm exec -w @resttek/api -- tsc --noEmit -p tsconfig.json`; `npm run test -w @resttek/web-admin`; `npm run test -w @resttek/web-empleados`; `npm run test -w @resttek/web-clientes` tras T34; build de cada una de las tres apps; revisión de enlaces y recorrido documentado.
-  - Evidencia parcial (integración 2026-10-30, sin marcar): todas las suites, `tsc` y los tres builds pasan en `21/gestion-mesas` (ver nota de integración en el bloque E). Falta la documentación de T45–T46.
+  - Evidencia parcial (sin marcar): todas las suites, `tsc` y los tres builds pasan en `21/gestion-mesas` tras la integración (ver nota en el bloque E). Documentación actualizada en T45–T46 y contrastada con el código, con enlaces revisados. Queda sin marcar hasta que T47 confirme en navegador que el recorrido documentado coincide con el real.
 
 ## Reglas de seguimiento y finalización
 
