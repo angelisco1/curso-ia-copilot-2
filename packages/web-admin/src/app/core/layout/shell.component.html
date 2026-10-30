@@ -40,6 +40,12 @@
                 <lucide-icon name="users" [size]="14"></lucide-icon>
                 <span>Empleados</span>
               </a>
+              @if (isAdmin()) {
+                <a [routerLink]="['/restaurants', r.id, 'tables']" routerLinkActive="active" class="sub-nav-item">
+                  <lucide-icon name="layout-grid" [size]="14"></lucide-icon>
+                  <span>Mesas</span>
+                </a>
+              }
               <a [routerLink]="['/restaurants', r.id, 'edit']" routerLinkActive="active" class="sub-nav-item">
                 <lucide-icon name="settings" [size]="14"></lucide-icon>
                 <span>Configuración</span>

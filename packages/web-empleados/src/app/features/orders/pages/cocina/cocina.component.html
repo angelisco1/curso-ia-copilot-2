@@ -21,8 +21,11 @@
         <div class="order-card">
           <div class="order-header">
             <span class="order-id">Pedido #{{ order.id.substring(0, 8) }}</span>
-            @if (order.tableId) {
-              <span class="table-badge">Mesa {{ order.tableId }}</span>
+            @if (tableLabel(order); as label) {
+              <span class="table-badge">Mesa {{ label }}</span>
+              @if (isClosedVisit(order)) {
+                <span class="table-badge">Visita cerrada</span>
+              }
             }
           </div>
           <div class="order-items">

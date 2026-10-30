@@ -51,7 +51,7 @@ contexts/employee/
 
 `contexts/shared/` no es un bounded context de negocio: contiene el value object `Email` y los middlewares y el `errorHandler` de Express.
 
-### 2. Por capas → `restaurant`, `dish`, `ingredient`, `order`
+### 2. Por capas → `restaurant`, `dish`, `ingredient`, `order`, `table`
 
 El resto de dominios **no** usan bounded contexts. Se organizan en carpetas transversales por tipo de fichero:
 
@@ -65,6 +65,8 @@ src/
 ```
 
 Con un fichero por dominio en cada carpeta: `models/dish.model.ts`, `services/dish.service.ts`, `repositories/dish.repository.ts`, etc.
+
+Las mesas reparten su lógica en tres piezas por capa: `table` (CRUD y estado), `table-session` (ocupación y recuperación por el cliente) y `table-order` (pedidos de la visita actual de una mesa). Por eso existen `services/table.service.ts`, `services/table-session.service.ts` y `services/table-order.service.ts`, con sus repositorios, controladores y rutas.
 
 **Diferencia clave**: aquí no hay entidades de dominio con comportamiento. `Restaurant`, `Dish`, `Ingredient` y `Order` son `interface` planas; la validación vive en los servicios y en funciones sueltas del modelo.
 
@@ -322,7 +324,28 @@ Los ingredientes son **más restrictivos** que los platos: solo `admin` puede cr
 
 Ninguna ruta de pedidos aplica `authorize()`: cualquier usuario autenticado puede cambiar el estado de cualquier ítem.
 
-`GET /orders/active` devuelve los pedidos del restaurante que tengan **al menos un ítem** en estado distinto de `entregado`.
+Cuando el actor es un cliente, `POST /orders` exige `tableSessionId` de una ocupación propia y abierta, con `restaurantId` y `tableId` coherentes con ella. La validación y la escritura se hacen en la misma transacción, así que no se crean pedidos en una ocupación que se cierra a la vez. Los errores de ocupación responden con `{ error, message }` por el `errorHandler`; el resto de errores de creación conservan el formato anterior (`{ error }`). Las llamadas de roles no cliente no necesitan ocupación. La tabla de errores está en [orders.openapi.yaml](../../packages/api/docs/orders.openapi.yaml).
+
+`GET /orders/active` devuelve los pedidos del restaurante que tengan **al menos un ítem** en estado distinto de `entregado`. Incluye los pedidos de ocupaciones ya cerradas (`tableSessionEndedAt` no nulo) y los antiguos sin ocupación, para que cocina, barra y entregas los sigan procesando.
+
+### Mesas y ocupaciones
+
+| Método | Ruta | Roles |
+| --- | --- | --- |
+| `POST` | `/api/v1/restaurants/:restaurantId/tables` | admin |
+| `GET` | `/api/v1/restaurants/:restaurantId/tables` | admin, manager, camarero |
+| `GET` | `/api/v1/restaurants/:restaurantId/tables/available?partySize=N` | cliente |
+| `GET` | `/api/v1/restaurants/:restaurantId/tables/:tableId` | admin, manager, camarero |
+| `PUT` | `/api/v1/restaurants/:restaurantId/tables/:tableId` | admin |
+| `DELETE` | `/api/v1/restaurants/:restaurantId/tables/:tableId` | admin — borrado lógico, 204 |
+| `PATCH` | `/api/v1/restaurants/:restaurantId/tables/:tableId/status` | admin, manager, camarero |
+| `GET` | `/api/v1/restaurants/:restaurantId/tables/:tableId/orders` | admin, manager, camarero — pedidos de la ocupación abierta, `[]` si no hay |
+| `POST` | `/api/v1/restaurants/:restaurantId/table-sessions` | cliente — 201 si abre ocupación, 200 si es un reintento de la misma |
+| `GET` | `/api/v1/restaurants/:restaurantId/table-sessions/current` | cliente — su ocupación abierta en ese restaurante, o `null` |
+
+Además de `authorize()`, el servicio comprueba que manager y camarero solo operan en su propio restaurante (403), y que la mesa pertenece al restaurante de la ruta (404). `/available` se registra antes de `/:tableId` para que no se interprete como un id. La disponibilidad no expone datos de quién ocupa otras mesas, y el `clientId` de la ocupación sale del JWT, nunca del body.
+
+El contrato completo, con ejemplos y códigos de error, está en [tables.openapi.yaml](../../packages/api/docs/tables.openapi.yaml). Las reglas de estados y ocupaciones están en el [modelo de datos](../dominio/modelo-datos.md#table_sessions).
 
 Al crear un pedido, el servicio **expande las cantidades**: un ítem con `quantity: 3` se guarda como 3 filas de `order_items` con `quantity: 1` cada una, para poder seguir el estado de cada unidad por separado.
 
@@ -345,15 +368,19 @@ Ambos responden directamente, sin pasar por el `errorHandler`.
 
 Jerarquía: `Error` → `AppError` (abstracta) → errores específicos en `errors/DomainErrors.ts`. `AppError` asigna `this.name = this.constructor.name`, y el `errorHandler` decide el código HTTP a partir de ese nombre:
 
-- **404**: `EmployeeNotFoundError`, `RestaurantNotFoundError`, `IngredientNotFoundError`, `DishNotFoundError`
-- **401**: `InvalidCredentialsError`
+- **404**: `EmployeeNotFoundError`, `RestaurantNotFoundError`, `IngredientNotFoundError`, `DishNotFoundError`, `TableNotFoundError`, `TableSessionNotFoundError`
+- **401**: `InvalidCredentialsError`, `InvalidActorError`
+- **403**: `ForbiddenRestaurantError`, `ForbiddenRoleError`, `TableSessionForbiddenError`
+- **409**: `TableNumberConflictError`, `TableCapacityConflictError`, `TableNotAvailableError`, `TableCapacityExceededError`, `ActiveTableSessionExistsError`, `TableSessionClosedError`
 - **400**: cualquier otro `AppError`
 - **500**: errores no controlados
+
+La respuesta es siempre `{ error: <nombre del error>, message }`.
 
 Dos excepciones que conviene conocer:
 
 - `OrderNotFoundError` **no** está en la lista de 404. Si llegase al `errorHandler` se traduciría a 400.
-- `OrderController` no delega en el `errorHandler`: es el único controlador que **no llama a `next(error)`**, sino que hace su propio `try/catch` y construye la respuesta a mano. Por eso `GET /orders/:id` sí devuelve 404, pero el `PATCH` de estado devuelve 400 para el mismo error.
+- `OrderController` apenas delega en el `errorHandler`: hace su propio `try/catch` y construye la respuesta a mano. Por eso `GET /orders/:id` sí devuelve 404, pero el `PATCH` de estado devuelve 400 para el mismo error. La única excepción son los errores de ocupación (`TableSession*`) de `POST /orders`, que pasa con `next(error)` para que tengan el formato y los códigos de la lista anterior.
 
 ---
 
@@ -382,16 +409,19 @@ Los imports llevan extensión `.js` (`import { dbConfig } from '@config/database
 
 La clase `Database` (`config/database.ts`) encapsula `sqlite3` con una API basada en promesas:
 
-- `initialize()`: abre la conexión y ejecuta `runInitialMigrations()` (`CREATE TABLE IF NOT EXISTS`)
+- `initialize()`: abre la conexión y ejecuta `runInitialMigrations()` (`CREATE TABLE IF NOT EXISTS` y `addColumnIfMissing()` para columnas nuevas en tablas existentes; ver [evolución del esquema](../dominio/modelo-datos.md#evolución-del-esquema))
 - `run()`: INSERT/UPDATE/DELETE
 - `all<T>()`: SELECT de múltiples filas
 - `get<T>()`: SELECT de una fila
+- `transaction(work)`: ejecuta `work` entre `BEGIN IMMEDIATE` y `COMMIT`, con `ROLLBACK` si falla. Recibe un ejecutor con `run`/`all`/`get` propios de la transacción
 - `close()`: cierra la conexión
 - `getDb()`: acceso crudo; lanza `DatabaseNotInitializedError` si no se ha llamado a `initialize()`
 
 El módulo exporta una **instancia única** (`export const dbConfig = new Database()`) que se importa allá donde hace falta. No es un singleton con `getInstance()`: nada impide construir otra `Database`, y de hecho los tests lo hacen.
 
 La ruta del fichero se decide en el constructor: `:memory:` si `NODE_ENV=test`, y `packages/api/resttek.db` en cualquier otro caso.
+
+Hay una única conexión SQLite compartida, así que `run()`, `all()`, `get()` y `transaction()` pasan por una cola exclusiva: una transacción no se intercala con otras consultas. Es lo que hace atómicas la ocupación de una mesa, sus cambios de estado y la creación de pedidos de cliente. Esta garantía vale para un único proceso de la API.
 
 ---
 
@@ -400,6 +430,7 @@ La ruta del fichero se decide en el constructor: `:memory:` si `NODE_ENV=test`, 
 Con **Vitest** (`npm test` desde la raíz, o `npm run test:watch` dentro de `packages/api`). Los tests son unitarios y conviven con el código que prueban:
 
 - Dominio y casos de uso de `employee`, con dobles en `contexts/employee/application/mocks/`
-- Servicios y repositorios de `restaurant`, `ingredient` y `order`, con dobles en `repositories/mocks/`
+- Servicios y repositorios de `restaurant`, `ingredient`, `order` y `table`, con dobles en `repositories/mocks/`
+- Repositorios de mesas, ocupaciones y pedidos contra SQLite en memoria, incluidas carreras de ocupación y rollback (`table-session.repository.test.ts`), y la evolución del esquema (`config/database.test.ts`)
 
-**No hay tests de integración HTTP.** `supertest` figura como dependencia de desarrollo pero no se usa en ningún test, así que las rutas, los middlewares y el `errorHandler` no están cubiertos.
+Los tests HTTP con `supertest` cubren solo mesas, ocupaciones y pedidos: `routes/table.routes.test.ts`, `table-session.routes.test.ts`, `order.routes.test.ts` y `acceptance.routes.test.ts` ejercitan rutas, middlewares y `errorHandler` contra una BD en memoria. Las rutas del resto de dominios siguen sin tests HTTP.

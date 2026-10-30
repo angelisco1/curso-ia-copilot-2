@@ -2,12 +2,14 @@ import { randomUUID } from 'crypto'
 import type { Order, OrderItem } from '@models/order.model.js'
 import { normalizeOrderStatus } from '@models/order.model.js'
 import type { OrderRepository } from '@repositories/order.repository.js'
-import { RestaurantIdRequiredError, OrderNotFoundError } from '@errors/DomainErrors.js'
+import { RestaurantIdRequiredError, OrderNotFoundError, TableSessionRequiredError } from '@errors/DomainErrors.js'
 
 export interface CreateOrderRequest {
     restaurantId: string
     tableId: string | null
     clientId: string | null
+    actorRole?: string | null
+    tableSessionId?: string | null
     items: {
         dishId: string
         quantity: number
@@ -36,13 +38,30 @@ export class OrderService {
             }
         }
 
+        const isClient = request.actorRole === 'cliente'
+        const sessionId = typeof request.tableSessionId === 'string' && request.tableSessionId.trim() !== ''
+            ? request.tableSessionId
+            : null
+        if (isClient && sessionId === null) throw new TableSessionRequiredError()
+
         const order: Order = {
             id: randomUUID(),
             restaurantId: request.restaurantId,
             tableId: request.tableId,
             clientId: request.clientId,
             createdAt: new Date(),
-            items
+            items,
+            tableSessionId: sessionId,
+            tableNumber: null,
+            tableSessionEndedAt: null
+        }
+
+        if (sessionId !== null) {
+            // Validacion y escritura en una unica transaccion del repositorio.
+            return this.orderRepository.createInSession(order, {
+                ownerId: isClient ? request.clientId : null,
+                requestedTableId: request.tableId
+            })
         }
 
         await this.orderRepository.create(order)

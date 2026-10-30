@@ -1,0 +1,26 @@
+@if (error()) {
+  <div class="alert-error" role="alert">{{ error() }}</div>
+}
+@if (loading()) {
+  <div class="spinner" aria-label="Cargando pedidos"></div>
+} @else if (orders().length === 0 && !error()) {
+  <p class="empty">Esta visita aún no tiene pedidos.</p>
+} @else {
+  @for (order of orders(); track order.id; let i = $index) {
+    <section class="order">
+      <h4>Pedido {{ i + 1 }} <small>#{{ order.id.substring(0, 8) }}</small></h4>
+      <ul>
+        @for (item of order.items; track item.id) {
+          <li>
+            <span class="qty">{{ item.quantity }}x</span>
+            <span class="name">{{ item.dishName || 'Producto' }}</span>
+            @if (item.notes) {
+              <span class="notes">{{ item.notes }}</span>
+            }
+            <span class="badge badge-{{ item.status }}">{{ item.status }}</span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+}

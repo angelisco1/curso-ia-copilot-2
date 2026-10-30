@@ -1,0 +1,28 @@
+.table-number {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.status-libre {
+  background: var(--green-glow);
+  color: var(--green-light);
+}
+
+.status-ocupada {
+  background: var(--red-glow);
+  color: var(--red);
+}
+
+.status-reservada {
+  background: rgba(139, 146, 168, 0.1);
+  color: var(--text-secondary);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

@@ -97,7 +97,7 @@ Tras ejecutar `npm run seed`, estas credenciales están disponibles. **La contra
 
 | Rol | Email (= contraseña) | Restaurante | Acceso |
 | --- | --- | --- | --- |
-| **Admin** | `admin@resttek.com` | — | web-admin |
+| **Admin** | `admin@resttek.com` | — | web-admin, web-empleados (elige restaurante en salón) |
 | **Gerente** (`manager`) | `gerente1@resttek.com` | rest-1 | web-admin, web-empleados |
 | **Gerente** (`manager`) | `gerente2@resttek.com` | rest-2 | web-admin, web-empleados |
 | **Cocinero** | `cocinero1@resttek.com` | rest-1 | web-empleados (cocina) |
@@ -112,6 +112,8 @@ Por ejemplo, para entrar como admin: usuario `admin@resttek.com`, contraseña `a
 
 `seed` usa `INSERT OR IGNORE`, así que puedes ejecutarlo varias veces sin duplicar los datos de prueba. Al terminar imprime la lista completa de credenciales por consola.
 
+También crea mesas: en `rest-1`, las 1, 2 y 3 libres (capacidad 2, 4 y 6), la 4 reservada y la 5 ocupada a mano por el personal; en `rest-2`, las 1, 2 y 3 libres. Repetir el seed no recrea mesas borradas ni cambia sus estados.
+
 ---
 
 ## Primer Recorrido (Happy Path)
@@ -121,17 +123,21 @@ Por ejemplo, para entrar como admin: usuario `admin@resttek.com`, contraseña `a
 1. Accede a `http://localhost:4200`
 2. Inicia sesión con las credenciales de admin
 3. Navega al **Dashboard** → verás el listado de restaurantes
-4. Entra en un restaurante → explora **Platos**, **Ingredientes**, **Empleados**
+4. Entra en un restaurante → explora **Platos**, **Ingredientes**, **Empleados** y **Mesas**
 5. Prueba a crear un nuevo plato con ingredientes
+6. En **Mesas**, crea, edita o borra una mesa (número, descripción, capacidad y estado). Solo el admin gestiona mesas. Borrar una mesa ocupada cierra su ocupación, pero conserva sus pedidos
 
 ### Como Cliente
 
 1. Accede a `http://localhost:4202`
 2. Regístrate con una cuenta nueva o usa las credenciales de cliente
 3. Navega los restaurantes disponibles
-4. Entra en un restaurante → ve la carta
-5. Añade platos al carrito y realiza un pedido
-6. Consulta el estado en **Mis Pedidos**
+4. Entra en un restaurante → indica cuántas personas sois y elige una de las mesas libres con capacidad suficiente
+5. Pulsa continuar: en ese momento se ocupa la mesa y pasas a la carta
+6. Añade platos al carrito y realiza un pedido, que se asocia a tu mesa
+7. Consulta el estado en **Mis Pedidos**
+
+Si recargas, sales o cambias de restaurante, la mesa sigue ocupada y al volver la recuperas. Solo un empleado puede liberarla. Después de liberarla ya no puedes pedir en esa ocupación y tienes que elegir mesa de nuevo.
 
 ### Como Empleado
 
@@ -140,6 +146,13 @@ Por ejemplo, para entrar como admin: usuario `admin@resttek.com`, contraseña `a
 3. Verás los pedidos pendientes → marca un ítem como "Preparando" → "Listo"
 4. Inicia sesión como camarero → accedes a **Barra** y **Salón**
 5. En Salón, entrega los ítems que están listos
+6. En Salón verás todas las mesas con su estado. Abre una mesa ocupada para ver los pedidos de la visita actual, incluidos los entregados. Puedes cambiar el estado de una mesa a libre, ocupada o reservada
+
+Sobre las mesas:
+
+- **Reservada** es solo un estado manual para que nadie la ocupe; no hay fecha, hora ni datos de reserva.
+- **Liberar con pedidos pendientes** está permitido, con aviso. Los pedidos no se cancelan ni se entregan: siguen en cocina, barra y entregas, marcados como de una visita cerrada, y no aparecen en la siguiente visita de esa mesa.
+- El admin entra en web-empleados sin restaurante asignado y elige uno en Salón.
 
 ---
 
@@ -154,11 +167,16 @@ Terminal 3: (libre para git, tests, etc.)
 ### Tests
 
 ```bash
-# Ejecutar todos los tests
+# Tests de la API
 npm test
 
-# Ejecutar tests en modo watch (desarrollo activo)
+# Tests de la API en modo watch (desarrollo activo)
 cd packages/api && npm run test:watch
+
+# Tests de cada frontend (no los ejecuta `npm test`)
+npm run test -w @resttek/web-admin
+npm run test -w @resttek/web-empleados
+npm run test -w @resttek/web-clientes
 ```
 
 ---

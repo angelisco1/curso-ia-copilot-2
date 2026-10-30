@@ -18,6 +18,8 @@ export class ShellComponent {
   readonly userRole = computed(() => this.authStore.userRole())
   readonly userRestaurantId = computed(() => this.authStore.user()?.restaurantId)
   readonly hasRestaurant = computed(() => !!this.authStore.user()?.restaurantId)
+  /** Admin no tiene restaurante asignado: elige uno en salón. */
+  readonly canEnter = computed(() => this.hasRestaurant() || this.userRole() === 'admin')
 
   readonly canSeeCocina = computed(() => canAccessView(this.userRole(), 'cocina'))
 

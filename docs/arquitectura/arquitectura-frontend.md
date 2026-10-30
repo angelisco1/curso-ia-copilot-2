@@ -51,17 +51,29 @@ src/app/
 ├── app.config.ts
 ├── app.routes.ts
 ├── core/
+│   ├── guards/            → table-session.guard.ts
 │   ├── layout/            → shell.component.ts
-│   ├── models/            → dish, order, restaurant
-│   ├── services/          → dish, order, restaurant
-│   └── store/             → cart.store.ts
+│   ├── models/            → api-error, dish, order, restaurant, table
+│   ├── services/          → dish, order, restaurant, table
+│   └── store/             → cart.store.ts, table-session.store.ts
 └── features/
     ├── cart/cart.component.ts
     ├── menu/restaurant-menu.component.ts
     ├── orders/my-orders.component.ts
     ├── orders/order-detail.component.ts
-    └── restaurants/restaurant-list.component.ts
+    ├── restaurants/restaurant-list.component.ts
+    └── tables/table-selection.page.ts
 ```
+
+### Mesas en cada aplicación
+
+Cada app tiene sus propios modelos y servicio HTTP de mesas, sin importarlos de otra app ni de `web-shared`. El contrato común es el de la API ([tables.openapi.yaml](../../packages/api/docs/tables.openapi.yaml)).
+
+| App | Dónde | Qué hace |
+| --- | --- | --- |
+| `web-admin` | `features/tables/` (models, services, store, pages `table-list` y `table-form`) | CRUD de mesas bajo `restaurants/:restaurantId/tables`. Las rutas llevan `adminGuard` (`core/auth/admin.guard.ts`), así que un manager no entra ni con la URL directa. `TableStore` descarta respuestas tardías de otro restaurante. Antes de borrar avisa de que se cierra la ocupación y se conservan los pedidos |
+| `web-empleados` | `features/tables/` (models, services `table` y `restaurant`, store, componente `table-orders`) y la página de salón | Salón muestra todas las mesas con su estado, permite cambiarlo con confirmación al cerrar una ocupación, y abre el detalle de pedidos de la visita actual. Mantiene el panel de ítems `listo` para entregar. Admin, sin restaurante asignado, elige uno en salón |
+| `web-clientes` | `core/` (model, service, `TableSessionStore`, `tableSessionGuard`) y `features/tables/table-selection.page.ts` | Paso previo a la carta: número de personas, mesas disponibles y confirmación. El guard protege la carta. El carrito se vincula a la ocupación y el pedido se envía con `tableSessionId` |
 
 Ninguna de las tres aplicaciones tiene carpeta `shared/` propia: lo compartido vive en `@resttek/web-shared`.
 
@@ -107,10 +119,14 @@ export class DishStore {
 Caso particular en `web-empleados`:
 
 - `OrderStore` añade **polling cada 30 s** con `startPolling()` / `stopPolling()`, ya que la API no tiene websockets.
+- `TableStore` de mesas sigue el mismo polling de 30 s, con un único intervalo que se reinicia al cambiar de restaurante y se detiene al salir de salón. Descarta respuestas tardías de otro restaurante, mesa u ocupación, y no actualiza el estado de una mesa hasta que la API confirma el cambio.
 
 ### `web-clientes`: el patrón Store casi no se usa
 
-En `web-clientes` el patrón Store **no es la norma**: el único store real es `CartStore`, y es puramente local (sin HTTP) — vacía el carrito si añades un plato de otro restaurante, pero no envuelve ninguna llamada a la API.
+En `web-clientes` el patrón Store **no es la norma**. Hay dos stores:
+
+- `CartStore`, puramente local (sin HTTP). Vincula el carrito al restaurante y a la ocupación activa: lo vacía si añades un plato de otro restaurante o si cambia la visita, aunque sea en el mismo restaurante.
+- `TableSessionStore`, que guarda la ocupación del cliente consultándola siempre a la API (`GET .../table-sessions/current`), sin usar `localStorage` como fuente de verdad. Así, al recargar o volver de otro restaurante se recupera la misma mesa. Salir o cambiar de restaurante nunca libera la mesa. La ocupación en memoria va ligada al id del usuario, así que otro usuario que inicie sesión no la hereda.
 
 Para todo lo demás (restaurantes, carta/platos, confirmación y consulta de pedidos) los componentes de `features/` inyectan el `*Service` correspondiente directamente y llaman a sus métodos con `.subscribe({ next, error })`, sin pasar por ningún store ni por `firstValueFrom`:
 
@@ -314,6 +330,8 @@ El lazy loading **no es universal**: `web-clientes` carga `LoginComponent` y `Re
 
 `web-clientes` tampoco define ruta comodín `**`, así que una URL desconocida no muestra un "no encontrado".
 
+En `web-clientes`, el listado de restaurantes lleva a `restaurants/:id/tables` (selección de mesa) y la carta sigue en `restaurants/:id`, protegida por `tableSessionGuard`. El guard consulta la ocupación propia en el servidor y, si no hay, redirige a la selección de mesa. Como esa ruta no lleva el guard, no hay bucles. Si `POST /orders` responde con un error de ocupación (`TableSession*`), el carrito muestra el motivo, se vacía para no reenviarse a otra mesa y vuelve a la selección. Ante un fallo de red o un error del servidor conserva los productos para reintentar.
+
 ### Autorización de navegación (web-empleados)
 
 `core/auth/employee-access.ts` es la política local compartida por el `employeeRoleGuard` de las rutas hijas y por los enlaces del `ShellComponent`. El guard se ejecuta en acceso directo y navegación entre rutas hijas, y devuelve una redirección: camarero vuelve a `/barra`, cocinero a `/cocina`, y manager/admin pueden permanecer en cualquiera de las vistas. Cliente, rol ausente/desconocido o sesión ausente se envían a `/login`. La ruta raíz (`/`), incluida la usada por el login compartido tras autenticarse, se resuelve según el rol.
@@ -328,6 +346,12 @@ El lazy loading **no es universal**: `web-clientes` carga `LoginComponent` y `Re
 | Sin sesión | No | No | No | `/login` |
 
 El rol de gerente se almacena como `'manager'`, no como `'gerente'`. Esta política protege la navegación y activación de vistas en el frontend; no es una frontera de seguridad ni sustituye la autorización que la API aplica a sus endpoints. La suite del paquete se ejecuta con `npm run test -w @resttek/web-empleados` (no con el `npm test` de la raíz, que ejecuta las pruebas de la API).
+
+`ShellComponent` deja entrar al admin aunque no tenga restaurante asignado, para que lo elija en salón. Para el resto de roles se mantiene el aviso «Sin restaurante asignado». En cocina y barra, un admin sin restaurante no carga pedidos.
+
+### Pruebas por aplicación
+
+Las tres apps tienen `npm run test -w @resttek/<app>` (`ng test --watch=false` con Vitest y jsdom): `web-admin`, `web-empleados` y `web-clientes`. Ninguna se ejecuta con el `npm test` de la raíz.
 
 ---
 

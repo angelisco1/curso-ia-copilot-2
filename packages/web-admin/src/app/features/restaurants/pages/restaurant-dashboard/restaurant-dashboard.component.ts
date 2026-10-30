@@ -1,5 +1,6 @@
-import { Component, inject, OnInit, signal } from '@angular/core'
+import { Component, computed, inject, OnInit, signal } from '@angular/core'
 import { ActivatedRoute, RouterLink } from '@angular/router'
+import { AuthStore } from '@resttek/web-shared'
 import { LucideAngularModule } from 'lucide-angular'
 import { RestaurantStore } from '../../store/restaurant.store'
 
@@ -13,7 +14,9 @@ import { RestaurantStore } from '../../store/restaurant.store'
 export class RestaurantDashboardComponent implements OnInit {
   private readonly route = inject(ActivatedRoute)
   private readonly restaurantStore = inject(RestaurantStore)
+  private readonly authStore = inject(AuthStore)
 
+  readonly isAdmin = computed(() => this.authStore.userRole() === 'admin')
   restaurantId = ''
   restaurantName = signal('')
 

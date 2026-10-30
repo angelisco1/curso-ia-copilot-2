@@ -162,3 +162,123 @@ export class OrderNotFoundError extends AppError {
   }
 }
 
+
+export class InvalidTableStatusError extends AppError {
+    constructor(message?: string) {
+        super(message ?? 'Invalid table status')
+    }
+}
+
+export class InvalidTableNumberError extends AppError {
+    constructor() {
+        super('Table number must be a positive integer')
+    }
+}
+
+export class InvalidTableCapacityError extends AppError {
+    constructor() {
+        super('Table capacity must be a positive integer')
+    }
+}
+
+export class InvalidTableDescriptionError extends AppError {
+    constructor() {
+        super('Table description must be a string')
+    }
+}
+
+export class InvalidPartySizeError extends AppError {
+    constructor() {
+        super('Party size must be a positive integer')
+    }
+}
+
+export class InvalidTableIdError extends AppError {
+    constructor() {
+        super('Table ID is required')
+    }
+}
+
+export class TableNotFoundError extends AppError {
+    constructor() {
+        super('Table not found')
+    }
+}
+
+export class TableNumberConflictError extends AppError {
+    constructor() {
+        super('Table number already exists in this restaurant')
+    }
+}
+
+export class TableNotAvailableError extends AppError {
+    constructor() {
+        super('Table is not available')
+    }
+}
+
+export class TableCapacityExceededError extends AppError {
+    constructor() {
+        super('Party size exceeds table capacity')
+    }
+}
+
+export class ActiveTableSessionExistsError extends AppError {
+    constructor() {
+        super('Client already has an active table session in this restaurant')
+    }
+}
+
+export class TableCapacityConflictError extends AppError {
+    constructor() {
+        super('Capacity cannot be lower than the active party size')
+    }
+}
+
+export class ForbiddenRestaurantError extends AppError {
+    constructor() {
+        super('Actor cannot operate on this restaurant')
+    }
+}
+
+export class ForbiddenRoleError extends AppError {
+    constructor() {
+        super('Actor role cannot perform this operation')
+    }
+}
+
+export class InvalidActorError extends AppError {
+    constructor() {
+        super('Authenticated user is missing required claims')
+    }
+}
+
+export class TableSessionRequiredError extends AppError {
+    constructor() {
+        super('A table session is required to place an order')
+    }
+}
+
+export class TableSessionNotFoundError extends AppError {
+    constructor() {
+        super('Table session not found')
+    }
+}
+
+export class TableSessionForbiddenError extends AppError {
+    constructor() {
+        super('The table session does not belong to the client')
+    }
+}
+
+export class TableSessionClosedError extends AppError {
+    constructor() {
+        super('The table session is closed')
+    }
+}
+
+export class TableSessionMismatchError extends AppError {
+    constructor() {
+        super('The order does not match the restaurant or table of the session')
+    }
+}

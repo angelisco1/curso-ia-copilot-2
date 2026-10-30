@@ -6,11 +6,21 @@ import { DatabaseNotInitializedError } from '@errors/DomainErrors.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+export interface DbExecutor {
+    run(sql: string, params?: any[]): Promise<sqlite3.RunResult>
+    all<T>(sql: string, params?: any[]): Promise<T[]>
+    get<T>(sql: string, params?: any[]): Promise<T | undefined>
+}
+
 export class Database {
     private db: sqlite3.Database | null = null
     private dbPath: string
 
-    constructor() {
+    constructor(dbPath?: string) {
+        if (dbPath) {
+            this.dbPath = dbPath
+            return
+        }
         const env = process.env.NODE_ENV || 'development'
         if (env === 'test') {
             this.dbPath = ':memory:'
@@ -45,7 +55,33 @@ export class Database {
         return this.db
     }
 
-    public async run(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
+    /**
+     * Ejecuta sentencias de una en una (FIFO) sobre la conexion compartida. Una
+     * transaccion mantiene el turno hasta COMMIT/ROLLBACK, de modo que ninguna
+     * otra sentencia se intercala dentro de ella. Dentro de `transaction` hay
+     * que usar el `tx` recibido: llamar a `run/all/get` del propio Database
+     * esperaria a que termine la transaccion (interbloqueo).
+     */
+    private lockTail: Promise<void> = Promise.resolve()
+
+    private async acquire(): Promise<() => void> {
+        const previous = this.lockTail
+        let release!: () => void
+        this.lockTail = new Promise<void>(resolve => { release = resolve })
+        await previous
+        return release
+    }
+
+    private async exclusive<T>(work: () => Promise<T>): Promise<T> {
+        const release = await this.acquire()
+        try {
+            return await work()
+        } finally {
+            release()
+        }
+    }
+
+    private rawRun(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
         return new Promise((resolve, reject) => {
             this.getDb().run(sql, params, function (err) {
                 if (err) return reject(err)
@@ -54,7 +90,7 @@ export class Database {
         })
     }
 
-    public async all<T>(sql: string, params: any[] = []): Promise<T[]> {
+    private rawAll<T>(sql: string, params: any[] = []): Promise<T[]> {
         return new Promise((resolve, reject) => {
             this.getDb().all(sql, params, (err, rows) => {
                 if (err) return reject(err)
@@ -63,12 +99,43 @@ export class Database {
         })
     }
 
-    public async get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+    private rawGet<T>(sql: string, params: any[] = []): Promise<T | undefined> {
         return new Promise((resolve, reject) => {
             this.getDb().get(sql, params, (err, row) => {
                 if (err) return reject(err)
                 resolve(row as T)
             })
+        })
+    }
+
+    public async run(sql: string, params: any[] = []): Promise<sqlite3.RunResult> {
+        return this.exclusive(() => this.rawRun(sql, params))
+    }
+
+    public async all<T>(sql: string, params: any[] = []): Promise<T[]> {
+        return this.exclusive(() => this.rawAll<T>(sql, params))
+    }
+
+    public async get<T>(sql: string, params: any[] = []): Promise<T | undefined> {
+        return this.exclusive(() => this.rawGet<T>(sql, params))
+    }
+
+    public async transaction<T>(work: (tx: DbExecutor) => Promise<T>): Promise<T> {
+        return this.exclusive(async () => {
+            await this.rawRun('BEGIN IMMEDIATE')
+            const tx: DbExecutor = {
+                run: (sql, params) => this.rawRun(sql, params),
+                all: <R>(sql: string, params?: any[]) => this.rawAll<R>(sql, params),
+                get: <R>(sql: string, params?: any[]) => this.rawGet<R>(sql, params)
+            }
+            try {
+                const result = await work(tx)
+                await this.rawRun('COMMIT')
+                return result
+            } catch (error) {
+                await this.rawRun('ROLLBACK').catch(() => undefined)
+                throw error
+            }
         })
     }
 
@@ -163,11 +230,55 @@ export class Database {
                 status TEXT NOT NULL,
                 FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE CASCADE,
                 FOREIGN KEY(dish_id) REFERENCES dishes(id)
-            )
+            );
+
+            CREATE TABLE IF NOT EXISTS restaurant_tables (
+                id TEXT PRIMARY KEY,
+                restaurant_id TEXT NOT NULL,
+                number INTEGER NOT NULL CHECK (number > 0),
+                description TEXT NOT NULL DEFAULT '',
+                capacity INTEGER NOT NULL CHECK (capacity > 0),
+                status TEXT NOT NULL CHECK (status IN ('libre', 'ocupada', 'reservada')),
+                deleted_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(restaurant_id) REFERENCES restaurants(id)
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_tables_active_number
+                ON restaurant_tables(restaurant_id, number) WHERE deleted_at IS NULL;
+
+            CREATE TABLE IF NOT EXISTS table_sessions (
+                id TEXT PRIMARY KEY,
+                restaurant_id TEXT NOT NULL,
+                table_id TEXT NOT NULL,
+                client_id TEXT,
+                party_size INTEGER CHECK (party_size IS NULL OR party_size > 0),
+                started_at TEXT NOT NULL,
+                ended_at TEXT,
+                FOREIGN KEY(restaurant_id) REFERENCES restaurants(id),
+                FOREIGN KEY(table_id) REFERENCES restaurant_tables(id)
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_table_sessions_open_table
+                ON table_sessions(table_id) WHERE ended_at IS NULL;
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_table_sessions_open_client
+                ON table_sessions(restaurant_id, client_id) WHERE ended_at IS NULL AND client_id IS NOT NULL
         `.split(';')
 
         for (const q of queries) {
             if (q.trim()) await this.run(q)
+        }
+
+        await this.addColumnIfMissing('orders', 'table_session_id', 'TEXT REFERENCES table_sessions(id)')
+        await this.run('CREATE INDEX IF NOT EXISTS idx_orders_table_session ON orders(table_session_id)')
+    }
+
+    private async addColumnIfMissing(table: string, column: string, definition: string): Promise<void> {
+        const columns = await this.all<{ name: string }>(`PRAGMA table_info(${table})`)
+        if (!columns.some(c => c.name === column)) {
+            await this.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
         }
     }
 }

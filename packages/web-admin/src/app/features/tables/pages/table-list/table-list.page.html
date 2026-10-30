@@ -1,0 +1,60 @@
+<div class="fade-in">
+  <div class="page-header">
+    <h1>Mesas</h1>
+    <a [routerLink]="['new']" class="btn btn-primary">
+      <lucide-icon name="plus" [size]="16"></lucide-icon>
+      Nueva mesa
+    </a>
+  </div>
+
+  @if (deleteError()) {
+    <div class="alert-error" role="alert">{{ deleteError() }}</div>
+  }
+
+  @if (store.loading()) {
+    <div class="spinner" role="status" aria-label="Cargando mesas"></div>
+  } @else if (store.error()) {
+    <div class="alert-error" role="alert">{{ store.error() }}</div>
+  } @else if (store.tables().length === 0) {
+    <div class="empty-state card">
+      <lucide-icon name="utensils" [size]="40"></lucide-icon>
+      <p>No hay mesas para este restaurante</p>
+    </div>
+  } @else {
+    <div class="card table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Número</th>
+            <th>Descripción</th>
+            <th>Capacidad</th>
+            <th>Estado</th>
+            <th><span class="visually-hidden">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of store.tables(); track t.id) {
+            <tr>
+              <td class="table-number">{{ t.number }}</td>
+              <td>{{ t.description }}</td>
+              <td>{{ t.capacity }}</td>
+              <td>
+                <span class="badge" [class]="'badge status-' + t.status">{{ statusLabels[t.status] }}</span>
+              </td>
+              <td>
+                <div class="actions">
+                  <a [routerLink]="[t.id, 'edit']" class="btn btn-secondary btn-sm" [attr.aria-label]="'Editar mesa ' + t.number">
+                    <lucide-icon name="edit" [size]="14"></lucide-icon>
+                  </a>
+                  <button type="button" class="btn btn-danger btn-sm" [attr.aria-label]="'Eliminar mesa ' + t.number" (click)="onDelete(t)">
+                    <lucide-icon name="trash-2" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

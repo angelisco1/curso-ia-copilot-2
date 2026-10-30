@@ -17,11 +17,14 @@ Terminología del dominio y conceptos técnicos utilizados en el proyecto Restte
 | **DishIngredient** | Relación entre un plato y un ingrediente, con la cantidad necesaria. |
 | **Order** | Pedido realizado por un cliente. Contiene ítems (platos) y está asociado a un restaurante. |
 | **OrderItem** | Línea de un pedido: un plato con cantidad, notas opcionales y estado. |
+| **RestaurantTable** (mesa) | Mesa de un restaurante, con número único entre sus mesas activas, descripción, capacidad y estado. Se borra lógicamente para conservar su historial. |
+| **TableSession** (ocupación, visita) | Periodo durante el que una mesa está ocupada. La abre un cliente al confirmar mesa, o el personal al marcarla ocupada a mano. Se cierra al liberar, reservar o borrar la mesa. Agrupa los pedidos de esa visita. |
 
 Dos particularidades del modelo que conviene tener presentes:
 
 - **Los clientes son `Employee`.** No hay entidad ni tabla de clientes: un cliente es una fila de `employees` con `role = 'cliente'` y `restaurant_id = null`. Por eso el login es el mismo endpoint para todos y la respuesta se llama `employee` incluso al registrarse como cliente.
 - **Cada unidad pedida es un `OrderItem`.** Al crear un pedido con 3 unidades de un plato se generan 3 filas con `quantity: 1`, para que cocina pueda marcar el estado de cada una por separado.
+- **Un cliente solo pide dentro de su ocupación.** Antes de ver la carta indica cuántas personas son y confirma una mesa libre con capacidad suficiente. El servidor rechaza pedidos de cliente sin una ocupación propia abierta. Salir, recargar o cambiar de restaurante no libera la mesa: solo la libera el personal.
 
 ### Roles
 
@@ -35,6 +38,8 @@ Dos particularidades del modelo que conviene tener presentes:
 
 El valor almacenado es `manager`; "gerente" es solo su traducción en la interfaz. En `web-empleados`, camarero accede a barra y salón, cocinero a cocina, y manager y admin a las tres vistas. El acceso directo a una ruta y la navegación entre vistas se comprueban por rol; camarero inicia en `/barra`, cocinero en `/cocina`, y manager/admin en `/salon`. Sin sesión o con rol cliente, ausente o desconocido, la app redirige a `/login`. Esta restricción frontend guía la navegación y no sustituye la autorización de los endpoints de la API mediante `authorize()`.
 
+Mesas: solo admin las crea, edita y borra (web-admin). Admin, manager y camarero las consultan y cambian de estado desde salón; manager y camarero solo en su restaurante, y admin, que no tiene restaurante asignado, lo elige en salón. Cocinero no accede a las mesas.
+
 ### Estados de Pedido
 
 | Estado | Descripción | Quién lo cambia |
@@ -43,6 +48,16 @@ El valor almacenado es `manager`; "gerente" es solo su traducción en la interfa
 | **preparando** | Ítem siendo preparado en cocina. | cocinero |
 | **listo** | Ítem preparado, listo para servir. | cocinero |
 | **entregado** | Ítem entregado al cliente. Desaparece de las vistas activas. | camarero |
+
+### Estados de Mesa
+
+| Estado | Descripción | Quién lo cambia |
+| --- | --- | --- |
+| **libre** | Disponible. Es el único estado que se ofrece a los clientes, y solo si la capacidad alcanza para el grupo. | camarero, manager o admin (desde salón); admin (desde web-admin) |
+| **ocupada** | Tiene una ocupación abierta. La ocupa un cliente al confirmar mesa o el personal a mano. | cliente al confirmar; camarero, manager o admin |
+| **reservada** | Bloqueada a mano para que nadie la ocupe. Es solo un estado: no hay fecha, hora ni datos de reserva. | camarero, manager o admin |
+
+Pasar una mesa de `ocupada` a `libre` o `reservada` cierra su ocupación aunque tenga pedidos pendientes. Esos pedidos siguen en cocina, barra y entregas, etiquetados como de una visita cerrada, y no aparecen en la siguiente visita de la mesa.
 
 ### Categorías de Platos
 
@@ -89,7 +104,7 @@ Las tres capas aplican al contexto `employee`:
 | **Application** | Casos de uso. Orquesta la lógica de negocio. |
 | **Infrastructure** | Implementaciones concretas: BD, HTTP, servicios externos. |
 
-En `restaurant`, `dish`, `ingredient` y `order` la separación equivalente es por carpetas: `models/`, `repositories/`, `services/`, `controllers/` y `routes/`.
+En `restaurant`, `dish`, `ingredient`, `order` y `table` (mesas y ocupaciones) la separación equivalente es por carpetas: `models/`, `repositories/`, `services/`, `controllers/` y `routes/`.
 
 ### Patrones
 

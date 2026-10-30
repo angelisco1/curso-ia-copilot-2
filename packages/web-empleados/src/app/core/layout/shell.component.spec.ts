@@ -89,6 +89,16 @@ describe('ShellComponent', () => {
     expect(authService.logout).toHaveBeenCalledOnce()
   })
 
+  it('lets admin without restaurant enter to choose one in salon', () => {
+    role = 'admin'
+    restaurantId = null
+    const fixture = TestBed.createComponent(ShellComponent)
+    fixture.detectChanges()
+
+    expect(fixture.nativeElement.textContent).not.toContain('Sin restaurante asignado')
+    expect(fixture.nativeElement.querySelector('.sidebar')).not.toBeNull()
+  })
+
   it('preserves logout behavior from the assigned-restaurant shell', () => {
     const fixture = TestBed.createComponent(ShellComponent)
     fixture.detectChanges()
