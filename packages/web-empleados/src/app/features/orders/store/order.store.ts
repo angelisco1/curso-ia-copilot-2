@@ -12,21 +12,26 @@ export class OrderStore {
   private readonly _error = signal<string | null>(null);
 
   private pollingInterval: ReturnType<typeof setInterval> | null = null;
+  /** Invalida respuestas en vuelo al cambiar de restaurante o parar el polling. */
+  private generation = 0;
 
   readonly orders = this._orders.asReadonly();
   readonly loading = this._loading.asReadonly();
   readonly error = this._error.asReadonly();
 
   async loadOrders(restaurantId: string): Promise<void> {
+    const gen = this.generation;
     this._loading.set(true);
     this._error.set(null);
     try {
       const orders = await firstValueFrom(this.orderService.getActiveOrders(restaurantId));
+      if (gen !== this.generation) return;
       this._orders.set(orders);
     } catch (err: any) {
+      if (gen !== this.generation) return;
       this._error.set(err.message || 'Error al cargar pedidos');
     } finally {
-      this._loading.set(false);
+      if (gen === this.generation) this._loading.set(false);
     }
   }
 
@@ -51,7 +56,15 @@ export class OrderStore {
     }
   }
 
+  clear(): void {
+    this._orders.set([]);
+    this._error.set(null);
+  }
+
   startPolling(restaurantId: string): void {
+    this.stopPolling();
+    this._orders.set([]);
+    this._error.set(null);
     this.loadOrders(restaurantId);
     this.pollingInterval = setInterval(() => {
       this.loadOrders(restaurantId);
@@ -59,6 +72,8 @@ export class OrderStore {
   }
 
   stopPolling(): void {
+    this.generation++;
+    this._loading.set(false);
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;

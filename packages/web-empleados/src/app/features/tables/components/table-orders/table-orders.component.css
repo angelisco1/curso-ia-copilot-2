@@ -1,0 +1,14 @@
+.order { border-top: 1px solid var(--border-color); padding: 10px 0; }
+.order h4 { margin: 0 0 8px; font-size: 14px; color: var(--text-primary); }
+.order h4 small { color: var(--text-muted); font-weight: 400; }
+ul { list-style: none; margin: 0; padding: 0; }
+li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; }
+.qty { font-weight: 600; color: var(--green-light); }
+.name { color: var(--text-primary); }
+.notes { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.empty { color: var(--text-muted); }
+.badge { margin-left: auto; padding: 3px 10px; font-size: 11px; border-radius: 20px; text-transform: capitalize; }
+.badge-pendiente { background: var(--yellow-glow); color: var(--yellow); }
+.badge-preparando { background: var(--orange-glow); color: var(--orange); }
+.badge-listo { background: var(--green-glow); color: var(--green-light); }
+.badge-entregado { background: rgba(139, 146, 168, 0.1); color: var(--text-muted); }

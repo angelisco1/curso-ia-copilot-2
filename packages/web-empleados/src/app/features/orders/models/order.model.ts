@@ -16,6 +16,10 @@ export interface Order {
   restaurantId: string
   tableId: string | null
   clientId: string | null
+  /** Ausentes o null en pedidos históricos anteriores a las mesas. */
+  tableSessionId?: string | null
+  tableNumber?: number | null
+  tableSessionEndedAt?: string | null
   createdAt: string
   items: OrderItem[]
 }
