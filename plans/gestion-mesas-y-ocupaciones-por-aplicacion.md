@@ -249,10 +249,11 @@ Propiedad: `packages/web-empleados/**`. Mantener intacta la matriz de acceso exi
   - Dependencias: T28.
   - Comprobación: mostrar estados de todos los ítems incluidos entregados, distinguir pedidos múltiples y refrescar detalle; cambio de sesión/mesa descarta respuesta tardía y borra detalle anterior.
   - Evidencia: `table-orders.component.spec.ts` (pedidos separados «Pedido 1/2», todos los ítems incluidos entregados, vacío/cargando/error), bloque T30 de `salon.component.spec.ts` (ver pedidos solo en ocupadas, mesa sin visita) y `table.store.spec.ts` (cambio de mesa/sesión borra detalle y descarta respuesta tardía; última petición gana). El detalle usa solo `GET .../tables/:id/orders` (visita actual).
-- [ ] **T31 (10 min)** Mantener entregas y visibilidad de pedidos de visitas cerradas
+- [x] **T31 (10 min)** ~~Mantener entregas y visibilidad de pedidos de visitas cerradas~~
   - Archivos: salón, `features/orders/models/order.model.ts`, modelos/templates de barra y cocina para etiquetas de mesa cuando proceda; tests de filtros.
   - Dependencias: T02, T29, T30.
   - Comprobación: sigue existiendo panel de ítems `listo` y acción entregar; pendientes antiguos siguen en cocina/barra, sin mezclarse con nueva visita; usar número visible en lugar de UUID cuando esté disponible, fallback para pedidos antiguos.
+  - Evidencia: `cocina.component.spec.ts` y `barra.component.spec.ts` (número visible `tableNumber` en lugar de UUID, «Visita cerrada» solo con `tableSessionEndedAt`, fallback a `tableId` en pedidos históricos, sin etiqueta sin mesa), `table-label.spec.ts`, bloque T31 de `salon.component.spec.ts` (panel solo con ítems `listo` y acción entregar llama a `updateItemStatus(..., 'entregado')`) y `order.store.spec.ts` (sin intervalos duplicados, respuesta tardía descartada). Mutación comprobada: usar `order.tableId` en cocina hace fallar el spec. Los pedidos pendientes de visitas cerradas siguen en cocina/barra porque el filtro por estado/categoría no cambió.
 - [ ] **T32 (10 min)** Resolver restaurante de admin sin ampliar acceso a cocina
   - Archivos: salón, servicio de restaurantes local nuevo en `features/tables/services/`, tests; reutilizar guards existentes sin ampliar su matriz.
   - Dependencias: T28.
