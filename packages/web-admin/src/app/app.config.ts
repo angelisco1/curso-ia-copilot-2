@@ -4,7 +4,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http'
 import {
   LucideAngularModule,
   LayoutDashboard, Users, Utensils, Package, LogOut, Plus,
-  Edit, Trash2, ChevronLeft, ChevronRight, Search, Menu, Settings, Store
+  Edit, Trash2, ChevronLeft, ChevronRight, Search, Menu, Settings, Store, LayoutGrid
 } from 'lucide-angular'
 
 import { routes } from './app.routes'
@@ -22,7 +22,7 @@ export const appConfig: ApplicationConfig = {
     importProvidersFrom(
       LucideAngularModule.pick({
         LayoutDashboard, Users, Utensils, Package, LogOut, Plus,
-        Edit, Trash2, ChevronLeft, ChevronRight, Search, Menu, Settings, Store
+        Edit, Trash2, ChevronLeft, ChevronRight, Search, Menu, Settings, Store, LayoutGrid
       })
     )
   ]
