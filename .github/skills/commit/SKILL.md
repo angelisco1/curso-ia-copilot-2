@@ -22,22 +22,14 @@ Utiliza esta skill cuando el usuario pida ayuda para escribir, formatear o gener
 ## Estructura de un Mensaje de Commit
 
 
-
 ```
-
 <tipo>[alcance opcional]: <descripción>
 
-
-
 [cuerpo opcional]
-
-
 
 [pie(s) de página opcional(es)]
 
 ```
-
-
 
 ## Tipos de Commit
 
@@ -47,7 +39,7 @@ Utiliza esta skill cuando el usuario pida ayuda para escribir, formatear o gener
 
 * **fix**: Una corrección de errores para el usuario (corresponde a `PATCH` en Semantic Versioning).
 
-* **docs**: Cambio****clusivamente en la documentación.
+* **docs**: Cambios exclusivamente en la documentación.
 
 * **style**: Cambios que no afectan el significado del código (espacios en blanco, formato, puntos y comas faltantes, etc.).
 

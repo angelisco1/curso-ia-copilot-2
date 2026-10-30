@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "bash scripts/protect-constants.sh",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
