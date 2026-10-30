@@ -55,3 +55,14 @@ Las etiquetas se crean automáticamente en el repositorio si no existen todavía
 | `-R`, `--repo`      | Repositorio de GitHub `owner/repo` (por defecto, el del directorio actual) |
 | `-n`, `--dry-run`   | Muestra lo que se crearía sin llamar a la API de GitHub               |
 | `-h`, `--help`      | Muestra la ayuda                                                      |
+
+## Hook de protección de credenciales
+
+[`protect-constants.sh`](protect-constants.sh) recibe un evento `preToolUse` por
+stdin y devuelve una decisión JSON para Copilot. Requiere Bash y `jq`; si falta
+`jq` o la entrada no es válida, deniega la llamada sin mostrar sus argumentos.
+La configuración está en
+[`protect-constants.json`](../.github/hooks/protect-constants.json).
+
+Consulta el [README principal](../README.md#protección-de-credenciales-en-copilot)
+para conocer el alcance, los límites y el comando de pruebas.

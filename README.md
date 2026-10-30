@@ -16,6 +16,34 @@ Esta guía te lleva desde cero hasta tener el entorno funcionando y entender el 
 
 ---
 
+## Protección de credenciales en Copilot
+
+El hook [`protect-constants.json`](.github/hooks/protect-constants.json) ejecuta
+[`scripts/protect-constants.sh`](scripts/protect-constants.sh) antes de cada llamada
+a herramientas (`preToolUse`). Deniega las llamadas cuyos argumentos mencionen
+un archivo `CONSTANTS.js`, en cualquier directorio y sin distinguir mayúsculas.
+Esto incluye lecturas, ediciones y comandos de terminal con esa referencia.
+No lee el archivo ni registra los argumentos. Las entradas inválidas se deniegan;
+las demás llamadas siguen sujetas a los permisos normales de Copilot.
+
+Requiere Bash, `jq` y una sesión de Copilot compatible con hooks, iniciada desde
+la raíz del repositorio. Inicia una nueva sesión después de añadirlo y comprueba
+en la vista de hooks de Copilot que se ha cargado. La prueba del script se ejecuta
+sin abrir archivos de credenciales (requiere Node.js para las pruebas):
+
+```bash
+node --test .github/hooks/protect-constants.test.cjs
+```
+
+**Límite:** no es un aislamiento del sistema de archivos. No garantiza bloquear
+lecturas indirectas, comandos que construyan el nombre dinámicamente, enlaces
+simbólicos, búsquedas amplias que no mencionen el archivo ni herramientas ajenas
+a la sesión. Los hooks deben estar habilitados; un timeout puede dejar continuar
+la llamada según los permisos del entorno. Para una protección estricta, mantén
+los secretos fuera del workspace y del alcance del proceso del agente.
+
+---
+
 ## Setup Inicial
 
 ### 1. Clonar el repositorio

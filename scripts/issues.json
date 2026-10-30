@@ -1,23 +1,5 @@
 [
   {
-    "title": "Proteger páginas de empleados",
-    "type": "bug",
-    "projects": ["web-empleados"],
-    "body": "No se está controlando el acceso a http://localhost:4201/barra, http://localhost:4201/salon y http://localhost:4201/cocina.\n\n- Un camarero solo debería de poder entrar a barra y salón.\n- El cocinero solo debería de poder entrar a la cocina.\n- El gerente puede ver todo."
-  },
-  {
-    "title": "No cargan los datos",
-    "type": "bug",
-    "projects": ["web-admin"],
-    "body": "Si estamos en la pestaña de ingredientes del restaurante 1 y pulsamos en ingredientes del restaurante 2, no se cargan los ingredientes del restaurante 2 y se quedan los del restaurante 1 en la pantalla.\n\nLo mismo pasa con los platos."
-  },
-  {
-    "title": "Página en blanco al entrar en la url de platos",
-    "type": "bug",
-    "projects": ["web-admin"],
-    "body": "Cuando entramos directamente en esta ruta http://localhost:4200/restaurants/rest-2/dishes o cualquiera similar se queda la página en blanco."
-  },
-  {
     "title": "Seed no borra datos previos",
     "type": "bug",
     "projects": ["api"],
