@@ -12,7 +12,7 @@ import { Restaurant } from '../../core/models/restaurant.model'
     <div class="container">
       <div class="page-header">
         <h1>Restaurantes</h1>
-        <p>Selecciona un restaurante para ver su carta</p>
+        <p>Selecciona un restaurante para elegir mesa y ver su carta</p>
       </div>
 
       @if (loading()) {
@@ -26,7 +26,7 @@ import { Restaurant } from '../../core/models/restaurant.model'
       } @else {
         <div class="restaurant-grid">
           @for (restaurant of restaurants(); track restaurant.id) {
-            <a [routerLink]="['/restaurants', restaurant.id]" class="restaurant-card card">
+            <a [routerLink]="['/restaurants', restaurant.id, 'tables']" class="restaurant-card card">
               <div class="restaurant-logo">
                 @if (restaurant.logoUrl) {
                   <img [src]="restaurant.logoUrl" [alt]="restaurant.name" />

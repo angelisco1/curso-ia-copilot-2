@@ -1,0 +1,107 @@
+<div class="container">
+  <div class="page-header">
+    <div>
+      <a routerLink="/restaurants" class="back-link">← Volver a restaurantes</a>
+      <h1>Elige tu mesa</h1>
+      <p>Indica cuántas sois y selecciona una mesa libre.</p>
+    </div>
+  </div>
+
+  @if (notice(); as info) {
+    <div class="alert-error" role="alert" data-testid="notice">{{ info }}</div>
+  }
+
+  @if (actionError(); as message) {
+    <div class="alert-error" role="alert" data-testid="action-error">{{ message }}</div>
+  }
+
+  @if (sessionStore.loading() && !existing()) {
+    <div class="spinner" data-testid="checking" role="status" aria-label="Comprobando tu mesa"></div>
+  } @else if (existing(); as current) {
+    <section class="card notice" data-testid="existing">
+      <h2>Ya tienes la mesa {{ current.table.number }}</h2>
+      @if (current.session.partySize) {
+        <p>Grupo de {{ current.session.partySize }} personas.</p>
+      }
+      <a class="btn btn-primary" [routerLink]="['/restaurants', restaurantId()]" data-testid="continue-existing">
+        Continuar a la carta
+      </a>
+    </section>
+  } @else {
+    @if (sessionStore.error()) {
+      <div class="alert-error" role="alert" data-testid="session-error">{{ sessionStore.error() }}</div>
+    }
+
+    <form class="card party-form" (submit)="$event.preventDefault(); search()">
+      <label for="partySize">Número de personas</label>
+      <div class="party-row">
+        <input
+          id="partySize"
+          name="partySize"
+          type="number"
+          inputmode="numeric"
+          min="1"
+          step="1"
+          [value]="partyInput()"
+          (input)="onPartyInput($any($event.target).value)"
+          [attr.aria-invalid]="partyInvalid()"
+          aria-describedby="party-help" />
+        <button
+          type="submit"
+          class="btn btn-primary"
+          data-testid="search"
+          [disabled]="partySize() === null || searching()">
+          Ver mesas disponibles
+        </button>
+      </div>
+      <p id="party-help" class="hint">Entero mayor que 0.</p>
+      @if (partyInvalid()) {
+        <p class="error-msg" role="alert" data-testid="party-error">
+          Introduce un número entero de personas mayor que 0.
+        </p>
+      }
+    </form>
+
+    @if (searching()) {
+      <div class="spinner" data-testid="loading" role="status" aria-label="Cargando mesas"></div>
+    } @else if (searchError()) {
+      <div class="alert-error" role="alert" data-testid="search-error">{{ searchError() }}</div>
+    } @else if (tables(); as list) {
+      @if (list.length === 0) {
+        <div class="empty-state card" data-testid="empty">
+          <p>No hay mesas libres con capacidad para {{ partySize() }} personas.</p>
+        </div>
+      } @else {
+        <ul class="table-list" aria-label="Mesas disponibles">
+          @for (table of list; track table.id) {
+            <li>
+              <button
+                type="button"
+                class="card table-option"
+                data-testid="table-option"
+                [class.selected]="table.id === selectedTableId()"
+                [attr.aria-pressed]="table.id === selectedTableId()"
+                (click)="select(table)">
+                <strong>Mesa {{ table.number }}</strong>
+                <span>Capacidad: {{ table.capacity }}</span>
+                @if (table.description) {
+                  <span class="description">{{ table.description }}</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+        <div class="actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-testid="confirm"
+            [disabled]="selectedTable() === null || saving()"
+            (click)="confirm()">
+            @if (saving()) { Guardando... } @else { Continuar a la carta }
+          </button>
+        </div>
+      }
+    }
+  }
+</div>
