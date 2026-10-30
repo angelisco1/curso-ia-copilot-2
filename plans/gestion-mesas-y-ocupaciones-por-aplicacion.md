@@ -259,10 +259,11 @@ Propiedad: `packages/web-empleados/**`. Mantener intacta la matriz de acceso exi
   - Dependencias: T28.
   - Comprobación: camarero/manager usan restaurante del JWT y no pueden seleccionar otro; admin sin asignación elige restaurante; cambio reinicia polling/detalle de mesas y pedidos; cocinero sigue sin salón.
   - Evidencia: En esta base no existen los guards de `1/control-acceso-por-rol-web-empleados` (rama no integrada), así que se añadió `core/auth/salon-access.ts` (solo salón: camarero/manager/admin; cocinero redirigido a `/`). No se modificó la matriz de cocina/barra ni el menú de cocinero/camarero/manager; el único cambio de permisos es que admin entra a Salón (necesario por la API: admin opera mesas) y no ve cocina/barra. Al integrar esa rama habrá que unificar `salonGuard` con `employeeRoleGuard` (conflicto previsible en `app.routes.ts` y shell). Specs: `salon-access.spec.ts`, `app.routes.spec.ts` (solo salón con guarda; raíz→salón solo admin), `shell.component.spec.ts` (menús previos intactos; admin solo Salón; cocinero/camarero sin restaurante bloqueados), bloque T32 de `salon.component.spec.ts` (camarero/manager usan JWT y no pueden elegir; admin sin restaurante elige, cambio reinicia polling y limpia mesas/pedidos).
-- [ ] **T33 (10 min)** Verificar empleados y transiciones con API real
+- [x] **T33 (10 min)** ~~Verificar empleados y transiciones con API real~~
   - Archivos: specs de mesas/salón y este plan.
   - Dependencias: T17, T31, T32.
   - Comprobación: `npm run test -w @resttek/web-empleados` y `npm run build -w @resttek/web-empleados`; pruebas manuales de estados y pedido mixto comida/bebida conservando cocina/barra/entrega.
+  - Evidencia: `npm run test -w @resttek/web-empleados`: 11 archivos, 60 tests verdes. `npm run build -w @resttek/web-empleados` correcto. API real: worktree desacoplado de `21/gestion-mesas` (8dad5f6), `npm run seed`, `PORT=3012`; script Python con las peticiones exactas del servicio: listar mesas 200; PATCH de estado en ocupada→ocupada→reservada→libre (200) y ocupada→libre con pendiente (200); `GET /restaurants/:id/tables/:tableId/orders` con la visita actual; pedido mixto (principal + bebida, creado por cliente con sesión propia) visible en `GET /orders/active` con ambos ítems (cocina filtra no-bebida, barra bebida), preparando→listo→entregado por ítem (204), y tras liberar la mesa sigue activo y entregable con `tableSessionEndedAt`. NO se usó navegador: no se probó la interfaz renderizada contra la API; solo las peticiones del servicio y specs de componentes. API y worktree temporal detenidos y eliminados.
 
 ### D. Clientes — agente Frontend Angular, alcance web-clientes
 
@@ -369,13 +370,13 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Evidencia: pendiente.
 - [ ] **CA09 — Estados visibles y editables por personal autorizado.** Salón muestra todas las mesas, incluso ocupadas sin pedidos, y permite los tres estados.
   - Verificación: navegador como camarero, manager y admin; cambio persistente tras recarga; cocinero continúa en cocina sin acceso a salón.
-  - Evidencia: pendiente.
+  - Evidencia (parte empleados, sin marcar el CA): specs de salón (todas las mesas con estado, capacidad y número en texto; ocupada sin pedidos visible; tres botones), de shell y de rutas (cocinero sin salón, admin solo salón). Con API real (curl con las mismas rutas del servicio, JWT de camarero1): `GET /restaurants/rest-1/tables` 200 con 5 mesas; `PATCH .../status` ocupada/ocupada/reservada/libre 200 con `activeSessionId` coherente; cocinero1 recibe 403 en GET y PATCH de mesas; camarero de rest-1 sobre rest-2 403; estado inválido 400. NO se probó en navegador ni la persistencia tras recarga en UI, ni manager/admin en UI (admin: `GET /restaurants` y `GET /restaurants/rest-2/tables` 200).
 - [ ] **CA10 — Visita actual aislada.** Mesa ocupada muestra sus pedidos/estados, incluidos entregados, pero no los de sesiones anteriores.
   - Verificación: sesiones A y B sucesivas de una mesa con pedidos en ambas; detalle B solo contiene ids de B; ocupada manual sin pedidos muestra vacío.
-  - Evidencia: pendiente.
+  - Evidencia (parte empleados, sin marcar el CA): spec de `TableStore`/`TableOrdersComponent`/salón: detalle solo de la sesión activa, borrado y descarte de respuestas tardías al cambiar de mesa/sesión. API real: tras una visita de cliente con pedido mixto, `GET .../tables/:id/orders` devolvió ese pedido con `tableNumber` y `tableSessionEndedAt: null`, y `[]` tras liberar la mesa. NO se probó la secuencia de dos visitas A y B con pedidos en ambas ni el navegador.
 - [ ] **CA11 — Liberación con pendientes.** Se permite liberar con pedidos pendientes sin cancelarlos, entregarlos ni mostrarlos en la siguiente visita.
   - Verificación: liberar A pendiente, ocupar B y comprobar que A sigue en cocina/barra/panel de entregas identificado como anterior; nueva petición de A se rechaza.
-  - Evidencia: pendiente.
+  - Evidencia (parte empleados, sin marcar el CA): spec de salón: confirmación al cerrar ocupación con aviso de pendientes y sin cancelar ni entregar; API real: `PATCH ocupada->libre` con un ítem `listo` sin entregar devolvió 200, `GET /orders/active` siguió devolviendo el pedido con `tableSessionEndedAt` no nulo (la UI lo etiqueta «Visita cerrada» en cocina/barra/entregas, comprobado por specs) y el ítem pudo entregarse después (204). NO se probó ocupar B después ni el rechazo de nuevas peticiones de A, ni navegador.
 - [ ] **CA12 — Historial tras borrado.** Borrar oculta la mesa, cierra su ocupación y conserva sesiones, pedidos e ítems históricos.
   - Verificación: consulta de pedido anterior sigue funcionando; disponibilidad/listados no incluyen mesa; recrear mismo número obtiene id nuevo y no hereda pedidos.
   - Evidencia: pendiente.
@@ -390,7 +391,7 @@ Cada casilla se marca solo después de comprobarla. Las pruebas nuevas aquí men
   - Evidencia: pendiente.
 - [ ] **CA16 — Errores y refresco fiables.** Carga/error/vacío tienen presentación explícita; fallos no simulan éxito; las respuestas tardías no cruzan restaurante, grupo ni visita.
   - Verificación: tests con respuestas HTTP invertidas, 409 y fallo de red en cada app; timers de empleados se detienen al salir y no se duplican al volver.
-  - Evidencia: pendiente.
+  - Evidencia (parte empleados, sin marcar el CA): specs de `TableStore` (respuestas tardías de restaurante/mesa/sesión, error sin vaciar lista ni simular éxito, doble envío, un solo intervalo y parada al destruir), `OrderStore` y salón (cargando/error/vacío explícitos). Fallos de red/409 reales no se provocaron contra la API (solo 400/403). Parte de otras apps pendiente.
 - [ ] **CA17 — Capacidad y cambios administrativos coherentes.** No se reduce capacidad por debajo del grupo activo; PUT, PATCH y borrado mantienen el ciclo de sesiones.
   - Verificación: grupo 4, intentar capacidad 2 devuelve 409; capacidad 4 válida; cambiar ocupada a reservada cierra sesión; repetir ocupada no abre otra.
   - Evidencia: pendiente.
