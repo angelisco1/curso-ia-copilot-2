@@ -1,7 +1,9 @@
 import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
 import { LoginComponent } from '@resttek/web-shared';
 import { ShellComponent } from './core/layout/shell.component';
-import { authGuard } from '@resttek/web-shared';
+import { authGuard, AuthStore } from '@resttek/web-shared';
+import { salonGuard } from './core/auth/salon-access';
 
 export const routes: Routes = [
   {
@@ -15,7 +17,7 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        redirectTo: 'cocina',
+        redirectTo: () => (inject(AuthStore).userRole() === 'admin' ? 'salon' : 'cocina'),
         pathMatch: 'full'
       },
       {
@@ -28,6 +30,7 @@ export const routes: Routes = [
       },
       {
         path: 'salon',
+        canActivate: [salonGuard],
         loadComponent: () => import('./features/orders/pages/salon/salon.component').then(m => m.SalonComponent),
       }
     ]
