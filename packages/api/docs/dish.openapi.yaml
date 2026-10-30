@@ -1,0 +1,513 @@
+openapi: 3.0.3
+info:
+  title: API de platos de Resttek
+  version: 1.0.0
+  description: |
+    Contrato de las rutas de platos, privadas y publicas, de la API actual.
+    Los textos de documentacion estan en espanol; los mensajes de error
+    conservan el ingles que devuelve la implementacion.
+    La autorizacion comprueba solo el rol del JWT, no el restaurante del usuario.
+    Las operaciones por id buscan exclusivamente ese id: restaurantId no limita
+    la consulta, actualizacion ni eliminacion. No existe validacion HTTP general
+    de tipos ni de formato UUID. Los errores SQL y los errores que no derivan de
+    AppError se convierten en 500; no hay respuestas 409 especificas.
+servers:
+  - url: http://localhost:3000
+    description: API local; los paths incluyen el prefijo /api/v1.
+tags:
+  - name: Platos
+    description: Administracion y consulta autenticada de platos.
+  - name: Carta publica
+    description: Consulta anonima de platos disponibles.
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/restaurants/{restaurantId}/dishes:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    post:
+      tags: [Platos]
+      operationId: crearPlato
+      summary: Crear un plato
+      description: |
+        Roles permitidos: admin y manager. restaurantId procede de la ruta.
+        description nulo u omitido se guarda como null; available nulo u omitido
+        se convierte en true; ingredients nulo u omitido se convierte en [].
+        No se comprueba que los ingredientes pertenezcan al restaurante.
+        Referencias inexistentes, duplicadas o errores de persistencia pueden
+        producir 500. El guardado del plato y su receta no es transaccional.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearPlato'
+            example:
+              name: Ensalada de tomate
+              description: Tomate fresco con aceite de oliva
+              price: 8.5
+              category: entrante
+              available: true
+              ingredients:
+                - ingredientId: 31da2496-2222-4222-8222-123456789abc
+                  quantity: 0.25
+      responses:
+        '201':
+          description: Plato creado; se devuelve el objeto, sin envoltorio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plato'
+              examples:
+                plato:
+                  $ref: '#/components/examples/Plato'
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+    get:
+      tags: [Platos]
+      operationId: listarPlatos
+      summary: Listar los platos de un restaurante
+      description: |
+        Roles permitidos: admin, manager, camarero y cocinero. Incluye platos
+        disponibles y no disponibles, con sus ingredientes. Sin paginacion,
+        filtros de consulta ni orden garantizado. Un restaurante sin platos
+        o inexistente devuelve [] y no 404.
+      responses:
+        '200':
+          $ref: '#/components/responses/ListaPlatos'
+        '400':
+          $ref: '#/components/responses/ErrorInfraestructura'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/restaurants/{restaurantId}/dishes/{id}:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - $ref: '#/components/parameters/PlatoId'
+    get:
+      tags: [Platos]
+      operationId: obtenerPlato
+      summary: Obtener un plato por id
+      description: |
+        Roles permitidos: admin, manager, camarero y cocinero. Busca solo por id,
+        sin comprobar su relacion con restaurantId. Incluye la receta y puede
+        devolver un plato no disponible.
+      responses:
+        '200':
+          description: Plato encontrado, sin envoltorio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plato'
+              examples:
+                plato:
+                  $ref: '#/components/examples/Plato'
+        '400':
+          $ref: '#/components/responses/ErrorInfraestructura'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+    put:
+      tags: [Platos]
+      operationId: actualizarPlato
+      summary: Sustituir los datos y la receta de un plato
+      description: |
+        Roles permitidos: admin y manager. No es una actualizacion parcial.
+        Busca solo por id y conserva restaurantId y createdAt del registro.
+        description nulo u omitido pasa a null; ingredients nulo u omitido
+        vacia la receta. No comprueba que los ingredientes sean del restaurante.
+        available no tiene valor predeterminado en PUT: si se omite, se persiste
+        como falso y la propiedad se omite en la respuesta inmediata; con null,
+        se persiste como falso pero la respuesta inmediata contiene null.
+        El guardado y la sustitucion de la receta no son transaccionales.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarPlato'
+            example:
+              name: Ensalada de tomate
+              description: null
+              price: 9
+              category: entrante
+              available: false
+              ingredients: []
+      responses:
+        '200':
+          description: Datos actualizados, sin envoltorio; available puede omitirse.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plato'
+              examples:
+                plato:
+                  $ref: '#/components/examples/Plato'
+        '400':
+          $ref: '#/components/responses/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+    delete:
+      tags: [Platos]
+      operationId: eliminarPlato
+      summary: Eliminar un plato y su receta
+      description: |
+        Roles permitidos: admin y manager. Busca solo por id, sin comprobar
+        restaurantId. Elimina primero las asociaciones con ingredientes y
+        despues el plato. Las restricciones de persistencia pueden causar 500.
+      responses:
+        '204':
+          description: Plato eliminado. Respuesta sin cuerpo.
+        '400':
+          $ref: '#/components/responses/ErrorInfraestructura'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/Prohibido'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+  /api/v1/public/restaurants/{restaurantId}/dishes:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [Carta publica]
+      operationId: listarPlatosPublicos
+      summary: Consultar la carta disponible sin autenticacion
+      description: |
+        Devuelve solo platos con available verdadero, con el mismo objeto
+        completo que la ruta privada, incluida la receta. No requiere JWT ni
+        rol. Sin paginacion, filtros de consulta ni orden garantizado.
+        Si el restaurante no existe o no tiene platos disponibles devuelve [].
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/ListaPlatos'
+        '400':
+          $ref: '#/components/responses/ErrorInfraestructura'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Cabecera Authorization con el prefijo exacto Bearer y un espacio.
+        Se verifica la firma del token y su claim role; no se comprueba
+        pertenencia al restaurante ni se consulta el usuario en estas rutas.
+  parameters:
+    RestaurantId:
+      name: restaurantId
+      in: path
+      required: true
+      description: |
+        Identificador del restaurante. Se usa al crear y listar; en operaciones
+        por id no se contrasta con el restaurante del plato. No se valida UUID.
+      schema:
+        type: string
+      example: rest-1
+    PlatoId:
+      name: id
+      in: path
+      required: true
+      description: Identificador del plato; no se valida su formato UUID.
+      schema:
+        type: string
+      example: 50ab2496-1111-4111-8111-123456789abc
+  schemas:
+    Categoria:
+      type: string
+      enum: [entrante, principal, postre, bebida]
+      description: Categoria normalizada en las respuestas.
+      example: entrante
+    IngredientePlato:
+      type: object
+      required: [ingredientId, quantity]
+      description: |
+        Asociacion de receta. ingredientId no puede faltar ni ser solo espacios;
+        quantity debe ser positiva. Estos fallos lanzan Error generico y se
+        responden con 500, no 400. No hay validacion explicita del tipo numerico
+        ni de ausencia de quantity; las restricciones SQL pueden fallar despues.
+        No se comprueba pertenencia del ingrediente al restaurante.
+      properties:
+        ingredientId:
+          type: string
+          minLength: 1
+          description: Identificador del ingrediente, sin validacion UUID.
+          example: 31da2496-2222-4222-8222-123456789abc
+        quantity:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Cantidad en la unidad del ingrediente.
+          example: 0.25
+    CrearPlato:
+      type: object
+      required: [name, price, category]
+      description: |
+        Cuerpo para un alta valida. No hay validador general del esquema.
+        price solo se comprueba con <= 0; si falta puede llegar a SQL y causar
+        500. category ausente, nula o de tipo incorrecto causa 500 al normalizar.
+        Las propiedades adicionales no se procesan.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Obligatorio y no solo espacios; se conserva sin recortar.
+          example: Ensalada de tomate
+        description:
+          type: string
+          nullable: true
+          default: null
+          description: Descripcion opcional; omitida o nula pasa a null.
+        price:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Precio positivo en euros; <= 0 produce InvalidPriceError.
+          example: 8.5
+        category:
+          type: string
+          description: |
+            Se aplica toLowerCase() y trim(); el resultado debe ser entrante,
+            principal, postre o bebida. No se exige ya normalizada en la entrada.
+          example: ' Entrante '
+        available:
+          type: boolean
+          nullable: true
+          default: true
+          description: Omitida o nula pasa a true; no se valida el tipo en runtime.
+        ingredients:
+          type: array
+          nullable: true
+          default: []
+          description: Receta completa; omitida o nula pasa a [].
+          items:
+            $ref: '#/components/schemas/IngredientePlato'
+    ActualizarPlato:
+      type: object
+      required: [name, price, category]
+      description: |
+        Sustitucion, no parche. Las validaciones de name, price y category son
+        las mismas que en el alta. No se cambia el restaurante del registro.
+        Las propiedades adicionales no se procesan.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Obligatorio y no solo espacios; se conserva sin recortar.
+        description:
+          type: string
+          nullable: true
+          default: null
+          description: Si falta se elimina la descripcion anterior.
+        price:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Precio positivo; no existe comprobacion general de tipo.
+        category:
+          type: string
+          description: |
+            Normalizada con minusculas y trim; admite entrante, principal,
+            postre o bebida tras normalizar. Ausente o nula produce 500.
+          example: principal
+        available:
+          type: boolean
+          nullable: true
+          description: |
+            Sin valor predeterminado. Omitida se persiste como falso y se omite
+            de la respuesta inmediata; null se persiste como falso y se devuelve
+            como null. En consultas posteriores se devuelve un booleano.
+        ingredients:
+          type: array
+          nullable: true
+          default: []
+          description: Sustituye toda la receta; omitida o nula la vacia.
+          items:
+            $ref: '#/components/schemas/IngredientePlato'
+    Plato:
+      type: object
+      required: [id, name, description, price, category, restaurantId, ingredients, createdAt, updatedAt]
+      description: |
+        Representacion sin envoltorio. available siempre es booleano en GET,
+        pero puede ser null u omitirse en la respuesta inmediata del PUT.
+      properties:
+        id:
+          type: string
+          description: Identificador generado con randomUUID() en el alta.
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        price:
+          type: number
+          description: Precio en euros.
+        category:
+          $ref: '#/components/schemas/Categoria'
+        available:
+          type: boolean
+          nullable: true
+          description: Disponibilidad; ver particularidades de PUT.
+        restaurantId:
+          type: string
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/IngredientePlato'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ErrorAplicacion:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Nombre de la clase de error o InternalServerError.
+        message:
+          type: string
+          description: Mensaje literal de la implementacion, en ingles.
+    ErrorAcceso:
+      type: object
+      required: [error]
+      description: Los errores de middleware no contienen message.
+      properties:
+        error:
+          type: string
+  examples:
+    Plato:
+      summary: Plato disponible con receta
+      value:
+        id: 50ab2496-1111-4111-8111-123456789abc
+        name: Ensalada de tomate
+        description: Tomate fresco con aceite de oliva
+        price: 8.5
+        category: entrante
+        available: true
+        restaurantId: rest-1
+        ingredients:
+          - ingredientId: 31da2496-2222-4222-8222-123456789abc
+            quantity: 0.25
+        createdAt: '2026-10-29T10:00:00.000Z'
+        updatedAt: '2026-10-29T10:00:00.000Z'
+  responses:
+    ListaPlatos:
+      description: Lista sin envoltorio; puede estar vacia. Sin orden garantizado.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Plato'
+          examples:
+            vacia:
+              value: []
+            conPlato:
+              value:
+                - id: 50ab2496-1111-4111-8111-123456789abc
+                  name: Agua
+                  description: null
+                  price: 2
+                  category: bebida
+                  available: true
+                  restaurantId: rest-1
+                  ingredients: []
+                  createdAt: '2026-10-29T10:00:00.000Z'
+                  updatedAt: '2026-10-29T10:00:00.000Z'
+    Validacion:
+      description: |
+        AppError de validacion. name vacio o solo espacios produce
+        DishNameRequiredError; price <= 0, InvalidPriceError; categoria textual
+        no admitida, InvalidCategoryError; restaurantId vacio o solo espacios,
+        RestaurantIdRequiredError. DatabaseNotInitializedError tambien es 400.
+        Los fallos de receta, tipos, JSON mal formado o categoria ausente no
+        se convierten en estos errores: llegan al manejador generico 500.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          examples:
+            nombre:
+              value: {error: DishNameRequiredError, message: 'Dish name is required'}
+            precio:
+              value: {error: InvalidPriceError, message: 'Price must be a positive number'}
+            categoria:
+              value: {error: InvalidCategoryError, message: 'Invalid category: sopa. Must be one of: entrante, principal, postre, bebida'}
+            restaurante:
+              value: {error: RestaurantIdRequiredError, message: 'Restaurant ID is required'}
+    ErrorInfraestructura:
+      description: |
+        DatabaseNotInitializedError se responde con 400. Una categoria almacenada
+        no valida tambien puede producir InvalidCategoryError al leer platos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          example:
+            error: DatabaseNotInitializedError
+            message: Database is not initialized. Call dbConfig.initialize() first.
+    NoEncontrado:
+      description: No existe un plato con el id solicitado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          example: {error: DishNotFoundError, message: 'Dish not found'}
+    NoAutenticado:
+      description: JWT ausente, mal formado, invalido o caducado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAcceso'
+          examples:
+            ausente:
+              value: {error: 'Unauthorized: No token provided'}
+            malFormado:
+              value: {error: 'Unauthorized: Malformed token'}
+            invalido:
+              value: {error: 'Unauthorized: Invalid token'}
+    Prohibido:
+      description: El claim role no esta entre los roles permitidos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAcceso'
+          example: {error: 'Forbidden: Insufficient permissions'}
+    ErrorInterno:
+      description: |
+        Error no derivado de AppError, incluidos fallos SQL, tipos inesperados,
+        JSON mal formado y validacion de receta (id vacio o cantidad <= 0).
+        El mensaje original no se expone. No implica rollback de escrituras.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorAplicacion'
+          example: {error: InternalServerError, message: 'Something went wrong'}

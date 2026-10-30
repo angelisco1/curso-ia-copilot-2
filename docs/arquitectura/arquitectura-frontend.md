@@ -214,6 +214,8 @@ export const authGuard: CanActivateFn = () => {
 }
 ```
 
+En `web-empleados`, `authGuard` protege el shell frente a sesiones ausentes. La autorización local por rol se aplica adicionalmente en sus rutas hijas; no es una responsabilidad del guard compartido.
+
 ---
 
 ## Interceptors HTTP
@@ -312,29 +314,20 @@ El lazy loading **no es universal**: `web-clientes` carga `LoginComponent` y `Re
 
 `web-clientes` tampoco define ruta comodín `**`, así que una URL desconocida no muestra un "no encontrado".
 
-### Filtrado por Rol (web-empleados)
+### Autorización de navegación (web-empleados)
 
-El filtrado por rol se resuelve **de navegación** mediante `computed()` en el `ShellComponent`, que decide qué enlaces se pintan en el menú:
+`core/auth/employee-access.ts` es la política local compartida por el `employeeRoleGuard` de las rutas hijas y por los enlaces del `ShellComponent`. El guard se ejecuta en acceso directo y navegación entre rutas hijas, y devuelve una redirección: camarero vuelve a `/barra`, cocinero a `/cocina`, y manager/admin pueden permanecer en cualquiera de las vistas. Cliente, rol ausente/desconocido o sesión ausente se envían a `/login`. La ruta raíz (`/`), incluida la usada por el login compartido tras autenticarse, se resuelve según el rol.
 
-```tsx
-export class ShellComponent {
-    readonly userRole = computed(() => this.authStore.userRole())
+| Rol | `/barra` | `/salon` | `/cocina` | Inicio |
+| --- | --- | --- | --- | --- |
+| `camarero` | Sí | Sí | No | `/barra` |
+| `cocinero` | No | No | Sí | `/cocina` |
+| `manager` | Sí | Sí | Sí | `/salon` |
+| `admin` | Sí | Sí | Sí | `/salon` |
+| `cliente`, ausente o desconocido | No | No | No | `/login` |
+| Sin sesión | No | No | No | `/login` |
 
-    readonly canSeeCocina = computed(() =>
-        this.userRole() === 'cocinero' || this.userRole() === 'manager'
-    )
-    readonly canSeeBarra = computed(() =>
-        this.userRole() === 'camarero' || this.userRole() === 'manager'
-    )
-    readonly canSeeSalon = computed(() =>
-        this.userRole() === 'camarero' || this.userRole() === 'manager'
-    )
-
-    readonly defaultRoute = computed(() => { /* cocinero → /cocina, camarero → /barra */ })
-}
-```
-
-El rol de gerente es `'manager'`, no `'gerente'`. La autorización real es responsabilidad de la API.
+El rol de gerente se almacena como `'manager'`, no como `'gerente'`. Esta política protege la navegación y activación de vistas en el frontend; no es una frontera de seguridad ni sustituye la autorización que la API aplica a sus endpoints. La suite del paquete se ejecuta con `npm run test -w @resttek/web-empleados` (no con el `npm test` de la raíz, que ejecuta las pruebas de la API).
 
 ---
 
